@@ -17,11 +17,10 @@
  * a dependency of this package, which has one.
  */
 import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
-import { fileURLToPath } from 'node:url';
-import { writeAtomic } from '../src/lib/build-utils.mjs';
+import { writeAtomic, outDir } from '../src/lib/build-utils.mjs';
 import { colors, spacingScale, fonts, radiusScale, absent } from '../src/lib/tokens.mjs';
 
-const OUT = new URL('../dist/', import.meta.url);
+const OUT = outDir('dist/');
 
 // Properties whose value should be a token reference rather than a literal. Colour first, because
 // that is where drift starts.
@@ -76,5 +75,5 @@ const config = {
 };
 
 const body = `/* ${config.$generated} */\nmodule.exports = ${JSON.stringify(config, null, 2)};\n`;
-writeAtomic(fileURLToPath(new URL('stylelint.config.cjs', OUT)), body);
+writeAtomic(`${OUT}stylelint.config.cjs`, body);
 console.log(`wrote dist/stylelint.config.cjs (${TOKENED.length} tokened properties, ${Object.values(colors).length} colours)`);

@@ -7,11 +7,15 @@
  */
 import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readdirSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
 import { brandInfo, systemName, systemVersion, colors, registers, chartSeries, chartSeriesOnLight, chartSeriesOnDark, fonts, typeScale, spacingScale, grid, display, floors, motion, rules, opacity, focus, states, radiusTokens, elevationTokens, tokens as rawTokens, deprecations } from '../src/lib/tokens.mjs';
-import { ROOT, outDir , DIST, writeAtomic } from '../src/lib/build-utils.mjs';
+import { ROOT, BRAND, outDir , DIST, writeAtomic } from '../src/lib/build-utils.mjs';
 
 const OUT_DIR = outDir(DIST);
-const FONT_DIR = `${ROOT}${brandInfo?.fontsDir ?? 'fonts/'}`;
+// A brand's fontsDir is relative to its overlay file when the system is given as one, so a consumer's fonts
+// are read from the consumer's repository and not the engine's (#13).
+const FONT_BASE = BRAND?.endsWith('.json') ? dirname(resolve(BRAND)) : ROOT;
+const FONT_DIR = brandInfo?.fontsDir ? `${resolve(FONT_BASE, brandInfo.fontsDir)}${sep}` : `${ROOT}fonts/`;
 const FONT_URL = brandInfo ? './fonts/' : '../fonts/';
 
 const fam = (list) => list.map((f) => (/\s/.test(f) ? `"${f}"` : f)).join(', ');
@@ -19,8 +23,9 @@ const fam = (list) => list.map((f) => (/\s/.test(f) ? `"${f}"` : f)).join(', ');
 /** Map a woff2 filename to an @font-face block. */
 function fontFace(file) {
   let family, weight, style;
-  if (brandInfo?.fonts) {
-    const f = brandInfo.fonts.find((x) => x.file === file);
+  // A brand declares its own faces; one that lists none gets none, never the base system's (#13).
+  if (brandInfo) {
+    const f = brandInfo.fonts?.find((x) => x.file === file);
     if (!f) return null;
     ({ family, weight, style } = f);
   } else {

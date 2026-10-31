@@ -5,6 +5,7 @@
  */
 import { mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { resolve, sep } from 'node:path';
 import { systemFromEnv } from './env.mjs';
 
 /** Absolute path to the repo root, trailing slash included. */
@@ -16,9 +17,13 @@ export const BRAND = systemFromEnv() || null;
 const brandKey = BRAND && BRAND.endsWith('.json') ? BRAND.split(/[\\/]/).pop().replace(/(\.tokens)?\.json$/, '') : BRAND;
 export const DIST = BRAND ? `dist/brands/${brandKey}/` : 'dist/';
 
-/** Ensure `${ROOT}${sub}` exists and return it. */
+/**
+ * Ensure `${ROOT}${sub}` exists and return it. When STANDARDS_OUT is set, the build writes there instead,
+ * so a consumer's build lands in its own repository and not inside the installed package (#12).
+ */
 export function outDir(sub) {
-  const dir = `${ROOT}${sub}`;
+  const out = process.env.STANDARDS_OUT;
+  const dir = out ? `${resolve(out)}${sep}` : `${ROOT}${sub}`;
   mkdirSync(dir, { recursive: true });
   return dir;
 }

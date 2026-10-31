@@ -12,6 +12,7 @@
  *   standards mark issue --key k --dataset d  freeze a mark and commit the record of what made it
  *   standards move <name> [--content f.json]  a spread scaffold from its recipe
  *   standards build                           tokens.css, components.css, mark, exports, generated pages
+ *                                             (into STANDARDS_OUT when set, else the package's dist/)
  *   standards site                            assemble site/
  *   standards pdf <page.html> [out.pdf]       print with the page tokens
  *   standards golden                          rewrite the golden spec snapshots
@@ -64,6 +65,7 @@ const npm = (script) => {
   // is resolved here, before the directory changes under it.
   const env = childEnv();
   if (env.STANDARDS_SYSTEM?.endsWith('.json')) env.STANDARDS_SYSTEM = resolvePath(process.cwd(), env.STANDARDS_SYSTEM);
+  if (env.STANDARDS_OUT) env.STANDARDS_OUT = resolvePath(process.cwd(), env.STANDARDS_OUT);
   const r = spawnSync('npm', ['run', script], { stdio: 'inherit', cwd: ROOT, env }); process.exit(r.status ?? 1);
 };
 
