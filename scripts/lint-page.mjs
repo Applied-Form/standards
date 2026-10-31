@@ -14,6 +14,7 @@
  *   --out <file>           where --baseline-write writes (default: ./standards-baseline.json)
  *   --register <i|ii>      lint a page that declares no register as if it were in this one; a
  *                          page that declares its own keeps it, and the output says which was assumed
+ *   --system <tokens.json | pack | name>  the system to judge against, in place of STANDARDS_SYSTEM
  *
  * A config or baseline under the old name is read, and written, at its own path, with one line.
  * An explicit --config or --baseline path gets no fallback.
@@ -26,15 +27,27 @@ import { resolve as resolvePath, dirname } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { BASELINE } from '../src/lib/names.mjs';
 import { resolveFile } from '../src/lib/resolve-file.mjs';
-import { systemFromEnv } from '../src/lib/env.mjs';
-import { lintPages, sampledViewports, VIEWPORTS } from '../src/lib/page-lint.mjs';
-import { loadConfig, loadBaseline, buildBaseline, mergeBaseline, applyPolicy, policyNotes, severityOf, splitArgs, pageKey } from '../src/lib/policy.mjs';
+import { systemFromEnv, setSystem } from '../src/lib/env.mjs';
+import { resolveSystem } from '../src/lib/system-arg.mjs';
+
+// --system is fixed before anything that reads the tokens is imported: they are read once, as they load (#11).
+{
+  const argv = process.argv.slice(2);
+  const at = argv.indexOf('--system');
+  if (at !== -1) {
+    const given = argv[at + 1];
+    if (given == null || given.startsWith('--')) { console.error('error: --system needs a value: a token overlay, a Standards pack tokens.json, a bundled pack or a brand name'); process.exit(2); }
+    try { setSystem(resolveSystem(given).brand); } catch (e) { console.error(`error: ${e.message}`); process.exit(2); }
+  }
+}
+const { lintPages, sampledViewports, VIEWPORTS } = await import('../src/lib/page-lint.mjs');
+const { loadConfig, loadBaseline, buildBaseline, mergeBaseline, applyPolicy, policyNotes, severityOf, splitArgs, pageKey } = await import('../src/lib/policy.mjs');
 
 const { files, opts } = splitArgs(process.argv.slice(2));
 const flag = (name) => opts[name] !== undefined;
 const opt = (name, fallback = null) => (typeof opts[name] === 'string' ? opts[name] : fallback);
 if (files.length === 0) {
-  console.error('usage: node scripts/lint-page.mjs <file.html|url> [...] [--json] [--register i|ii] [--config f] [--baseline [f]] [--baseline-write --out f]');
+  console.error('usage: node scripts/lint-page.mjs <file.html|url> [...] [--json] [--register i|ii] [--system f] [--config f] [--baseline [f]] [--baseline-write --out f]');
   process.exit(2);
 }
 

@@ -206,7 +206,7 @@ export function splitArgs(argv) {
     if (!a.startsWith('--')) { files.push(a); continue; }
     const name = a.slice(2);
     const next = argv[i + 1];
-    const takesValue = ['config', 'out', 'richness', 'sample', 'seed', 'register'].includes(name);
+    const takesValue = ['config', 'out', 'richness', 'sample', 'seed', 'register', 'system'].includes(name);
     const optionalJson = name === 'baseline' && next && next.endsWith('.json');
     if ((takesValue && next && !next.startsWith('--')) || optionalJson) { opts[name] = next; i += 1; }
     else opts[name] = true;
