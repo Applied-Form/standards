@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { lintPages, launchBrowser, DEFAULT_FILE_ROOTS } from '../src/lib/page-lint.mjs';
 import { RULES } from '../src/lib/rules/registry.mjs';
-import { CLIENT_KEY, COMMAND, ENV } from '../src/lib/names.mjs';
+import { CLIENT_KEY, COMMAND } from '../src/lib/names.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const standards = join(root, 'bin/standards.mjs');
@@ -50,7 +50,7 @@ test('a page that declares a register is still judged by every rule', { skip }, 
 
 test('standards lint with no system says so once, and how to load one', { skip }, () => {
   const d = dirWith({ 'page.html': ORDINARY });
-  const env = { ...process.env }; delete env.STANDARDS_SYSTEM; delete env[ENV.STANDARDS_SYSTEM];
+  const env = { ...process.env }; delete env.STANDARDS_SYSTEM;
   const out = spawnSync(process.execPath, [standards, 'lint', 'page.html', '--sample', '0'], { cwd: d, env, encoding: 'utf8' });
   const text = out.stdout + out.stderr;
   assert.equal((text.match(/No system loaded/g) ?? []).length, 1, text);
@@ -61,7 +61,7 @@ test('standards lint with no system says so once, and how to load one', { skip }
 
 test('standards init --pack instrument loads Instrument for every later standards command', { skip }, () => {
   const d = dirWith({ 'page.html': ORDINARY });
-  const env = { ...process.env }; delete env.STANDARDS_SYSTEM; delete env[ENV.STANDARDS_SYSTEM];
+  const env = { ...process.env }; delete env.STANDARDS_SYSTEM;
   const init = spawnSync(process.execPath, [standards, 'init', '--pack', 'instrument'], { cwd: d, env, encoding: 'utf8' });
   assert.equal(init.status, 0, init.stderr);
   assert.ok(existsSync(join(d, '.standards/system.json')));

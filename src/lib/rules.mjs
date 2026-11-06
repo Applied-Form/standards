@@ -128,6 +128,13 @@ export function advise(spec) {
   const out = [];
   // Print orphan headings are estimated from scroll positions, not real fragmentation: advisory until Chromium exposes page breaks.
   for (const h of spec.print?.orphanHeadings ?? []) out.push({ rule: 'print-orphan-heading', message: `Heading "${h}" may print alone at the foot of a page (estimated)`, heading: h });
+  const pc = spec.register === 'ii' ? spec.print?.pacing : null;
+  if (pc) {
+    const perOpener = pc.openers.length ? pc.pagesPerOpener : 0;
+    const over = pc.longestRun > floors.pacingRunFail || perOpener > floors.pacingOpenerFail;
+    const near = pc.longestRun > floors.pacingRunWarn || perOpener > floors.pacingOpenerWarn;
+    if (near && !over) out.push({ rule: 'pacing-advisory', message: `The document has ${pc.longestRun} printed pages of reading with no opener (warning at ${floors.pacingRunWarn}) and ${pc.pagesPerOpener.toFixed(1)} reading pages per opener (warning at ${floors.pacingOpenerWarn}), estimated`, pacing: pc });
+  }
   const reg = spec.register;
   const palette = registers[reg] ?? registers.ii;
   for (const t of spec.text ?? []) {

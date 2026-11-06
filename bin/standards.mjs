@@ -23,29 +23,24 @@
  *   standards init --from-site <page.html|url> [...]  propose a pack from a rendered site; written once a person confirms it
  *   standards mcp-config [--client claude-code|cursor]  the MCP server block for an agent's config
  */
-import { exitOnConflict } from '../src/lib/env-guard.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve as resolvePath } from 'node:path';
+import { join, resolve as resolvePath } from 'node:path';
 import { CONFIG } from '../src/lib/names.mjs';
-import { resolveFile } from '../src/lib/resolve-file.mjs';
-import { systemFromEnv, chromiumFromEnv, setSystem, childEnv } from '../src/lib/env.mjs';
+import { refuseRemovedNames } from '../src/lib/removed-names.mjs';
+import { systemFromEnv, setSystem, childEnv } from '../src/lib/env.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const [cmd, ...rest] = process.argv.slice(2);
-// Either name of a variable is read here, once, and the scripts this runs get the resolved values
-// under the new names (childEnv), so a deprecation line is printed here and not again. Both names set
-// to different values is a usage error: the library throws, and this reports it and exits 2.
-let given;
-try { given = systemFromEnv(); chromiumFromEnv(); } catch (e) { exitOnConflict(e); }
+refuseRemovedNames(); // a removed name in use is exit 2, never a quiet pass (decision 0029)
 // The system `standards init` named in standards.config.json is the one every command here judges
-// against, unless the caller's environment already says otherwise. A config under the old name is
-// read too, with one line, which the script this runs then does not repeat (resolveFile).
-const config = given === undefined ? resolveFile(process.cwd(), CONFIG.name, CONFIG.legacy) : null;
-if (config?.exists) {
+// against, unless the caller's environment already says otherwise.
+const given = systemFromEnv();
+const configPath = join(process.cwd(), CONFIG.name);
+if (given === undefined && existsSync(configPath)) {
   try {
-    const { system } = JSON.parse(readFileSync(config.path, 'utf8'));
+    const { system } = JSON.parse(readFileSync(configPath, 'utf8'));
     if (system) setSystem(resolvePath(process.cwd(), system));
   } catch { /* a malformed file is reported by the command that reads it */ }
 }

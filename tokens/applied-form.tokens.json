@@ -2,7 +2,7 @@
   "$description": "Reference: the neutral system the open package is tested against. Colour derived by `standards brand --hue 200 --paper #F6F6F4 --saturation 0.2`; positive-light and critical-light are the overlay's positive and critical mixed toward white until they clear 4.6:1 on its espresso, where the base pair sits at 4.5:1; structure, rules and the three OFL voices come from the base file. It exists so Standards can be published without publishing Applied Form's own palette, and it is not a design anyone should ship. The mark's shape parameters are replaced, because Applied Form's identify the brand; its size and placement limits are rules and stay. The two literal steps of the sequential chart scale are the midpoints of its own sand, clay and terra deep.",
   "$extensions": {
     "form.applied": {
-      "version": "4.0.1",
+      "version": "5.0.0",
       "aspectRatios": [
         "1:1",
         "2:1",
@@ -115,14 +115,6 @@
           "tabular": true,
           "note": "A whole spread in the data voice: a sheet of evidence with one italic Fraunces word against it. Experimental."
         },
-        "palimpsest": {
-          "ground": "{color.paper}",
-          "voices": [
-            "display"
-          ],
-          "layers": 3,
-          "note": "Display type overprinted in three grounds-as-ink, coming into register on scroll. Every layer clears 3:1. Experimental."
-        },
         "marginalia": {
           "ground": "{color.paper}",
           "voices": [
@@ -213,7 +205,7 @@
         ]
       },
       "recipes": {
-        "$description": "Each move as data. cells: grid-column range, layer, voice, role; optional aspect (a permitted ratio), offset {x: columns, y: spacing steps}, bleed (half-gutter | column | frame), rotation (0 | 90 | -90), motion (draw | register | count | step), form {g, lobes, ...}. The linter checks a data-spread section's grid children against its recipe; standards move <name> emits the scaffold with the matching composition classes.",
+        "$description": "Each move as data. cells: grid-column range, layer, voice, role; optional aspect (a permitted ratio), offset {x: columns, y: spacing steps}, bleed (half-gutter | column | frame), rotation (0 | 90 | -90), motion (draw | count | step), form {g, lobes, ...}. The linter checks a data-spread section's grid children against its recipe; standards move <name> emits the scaffold with the matching composition classes.",
         "colossus": {
           "ground": "paper",
           "cells": [
@@ -355,29 +347,6 @@
               "layer": "data",
               "voice": "data",
               "role": "sheet"
-            }
-          ]
-        },
-        "palimpsest": {
-          "ground": "paper",
-          "cells": [
-            {
-              "cell": "1 / -1",
-              "layer": "type",
-              "role": "eyebrow"
-            },
-            {
-              "cell": "1 / -1",
-              "layer": "type",
-              "voice": "display",
-              "role": "stack",
-              "motion": "register"
-            },
-            {
-              "cell": "1 / -1",
-              "layer": "data",
-              "voice": "data",
-              "role": "note"
             }
           ]
         },
@@ -1687,6 +1656,26 @@
     "provenance-after-words": {
       "$value": 800,
       "$description": "A Register II document longer than this carries a provenance panel."
+    },
+    "print-body-min-pt": {
+      "$value": 10,
+      "$description": "A Register II document printed with body text below this size in points fails. 10pt sits inside the 9.3 to 12pt range of the print analogues (decision 0032)."
+    },
+    "pacing-run-warn": {
+      "$value": 70,
+      "$description": "Printed pages of unbroken reading above which a Register II document is advised to break the run. Corpus of 47 long reports, UK-heavy and chosen by their issuers: median 43, upper quartile 61.5 (decision 0032)."
+    },
+    "pacing-run-fail": {
+      "$value": 100,
+      "$description": "Printed pages of unbroken reading above which a Register II document fails (decision 0032)."
+    },
+    "pacing-opener-warn": {
+      "$value": 30,
+      "$description": "Reading pages per section opener above which a Register II document is advised to add openers. The corpus upper quartile is 24 (decision 0032)."
+    },
+    "pacing-opener-fail": {
+      "$value": 45,
+      "$description": "Reading pages per section opener above which a Register II document fails (decision 0032)."
     }
   },
   "motion": {
@@ -1772,10 +1761,6 @@
     "$type": "number",
     "bled-form": {
       "$value": 0.35
-    },
-    "layer-ink": {
-      "$value": 0.85,
-      "$description": "Palimpsest overprint layers use multiply at this opacity so the base layer keeps its floor."
     }
   },
   "focus": {
@@ -1867,6 +1852,14 @@
           "unit": "mm"
         }
       }
+    },
+    "body": {
+      "$type": "dimension",
+      "$value": {
+        "value": 11,
+        "unit": "pt"
+      },
+      "$description": "The printed body size of a Register II document. The 19px screen body prints at 14.25pt, about half the density of the print analogues, which set body at 9.3 to 12pt (decision 0032)."
     }
   },
   "state": {

@@ -12,7 +12,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { launchBrowser, lintPages } from '../src/lib/page-lint.mjs';
 import { fixReport, selectorsOf, withBase, NOT_CHECKED } from '../src/lib/fix/page.mjs';
-import { ENV } from '../src/lib/names.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const STANDARDS_BIN = join(ROOT, 'bin/standards.mjs');
@@ -55,7 +54,7 @@ const page = ({ unfixable = false } = {}) => `<!doctype html>
 const FIXABLE_FAULTS = ['link-not-underlined', 'radius-present', 'shadow-present', 'target-size'];
 const WIDTHS = '320,1280';
 
-const env = () => { const e = { ...process.env }; delete e.STANDARDS_SYSTEM; delete e[ENV.STANDARDS_SYSTEM]; return e; };
+const env = () => { const e = { ...process.env }; delete e.STANDARDS_SYSTEM; return e; };
 const standards = (args, cwd) => spawnSync(process.execPath, [STANDARDS_BIN, 'fix', ...args], { cwd, encoding: 'utf8', env: env(), timeout: 300000 });
 const workspace = (html, name = 'page.html') => {
   // The command resolves paths against its working directory, which the system reports with links

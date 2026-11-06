@@ -1,6 +1,6 @@
 {
   "name": "@appliedform/standards",
-  "version": "4.0.1",
+  "version": "5.0.0",
   "description": "Standards by Applied Form: a design-system conformance gate measured in a real browser. DTCG tokens in, every rendered page checked at four fixed and two sampled widths, with drift surveys, an MCP server and an evaluation harness anyone can rerun.",
   "type": "module",
   "mcpName": "io.github.Applied-Form/standards",
@@ -10,9 +10,7 @@
     "node": ">=20"
   },
   "bin": {
-    "standards": "bin/standards.mjs",
-    "af": "bin/af.mjs",
-    "af-mcp": "bin/af-mcp.mjs"
+    "standards": "bin/standards.mjs"
   },
   "repository": {
     "type": "git",
@@ -47,7 +45,7 @@
     "eval:analyse": "node eval/analyse.mjs",
     "eval:judge": "node eval/judge-run.mjs",
     "eval:compare": "node eval/compare.mjs test/fixtures/violations.html test/fixtures/attacks.html test/fixtures/clean.html",
-    "prepack": "node -e \"const e={...process.env};delete e.STANDARDS_SYSTEM;delete e.AF_BRAND;require('child_process').execSync('npm run build',{stdio:'inherit',env:e})\""
+    "prepack": "node -e \"const e={...process.env};delete e.STANDARDS_SYSTEM;require('child_process').execSync('npm run build',{stdio:'inherit',env:e})\""
   },
   "dependencies": {
     "playwright": "^1.56.1"

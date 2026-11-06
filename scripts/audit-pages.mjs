@@ -49,7 +49,6 @@
  * otherwise, 2 on a usage error. --fix does not change that: the fixes are not written, so a page
  * that fails on disk fails the run.
  */
-import { exitOnConflict } from '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync, writeFileSync, existsSync, statSync, realpathSync, readdirSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, relative, join, isAbsolute, sep, basename, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -119,7 +118,7 @@ const scrub = (s) => String(s).replace(/(?<=^|[\s'"(=,])(?:file:\/\/)?\/[^\s'"()
 // path to it as every path in the report is shown; the command that repeats the run carries it as
 // it was typed.
 const { resolveSystem } = await import('../src/lib/system-arg.mjs');
-const { systemFromEnv, setSystem, CONFLICT } = await import('../src/lib/env.mjs');
+const { systemFromEnv, setSystem } = await import('../src/lib/env.mjs');
 let systemGiven = systemFromEnv() || null;
 if (opts.system) {
   try { setSystem(resolveSystem(opts.system).brand); } catch (e) { fail(e.message); }
@@ -258,7 +257,7 @@ const nothingOn = (results) => results.length > 0 && results.every(({ spec = {} 
   && ![spec.text, spec.imagery, spec.links, spec.targets, spec.charts].some((xs) => xs?.length));
 
 let browser;
-try { browser = await launchBrowser(); } catch (e) { if (e?.code === CONFLICT) exitOnConflict(e); fail(`could not start Chromium (${e.message.split('\n')[0]}). Run npx playwright install chromium, or set STANDARDS_CHROMIUM to a Chromium executable.`); }
+try { browser = await launchBrowser(); } catch (e) { fail(`could not start Chromium (${e.message.split('\n')[0]}). Run npx playwright install chromium, or set STANDARDS_CHROMIUM to a Chromium executable.`); }
 const unregistered = !systemFromEnv() && register == null ? 'universal' : 'house';
 
 const pages = [];
@@ -363,7 +362,7 @@ function json() { return !!opts.json; }
 const { quote } = audit;
 // The targets, the --root directories and the system as typed, so the command works from the
 // directory it was run in.
-const command = ['npx @appliedform/standards@4 audit', ...targets.map(quote), ...ROOTS.flatMap((r) => ['--root', quote(r.typed)]),
+const command = ['npx @appliedform/standards@5 audit', ...targets.map(quote), ...ROOTS.flatMap((r) => ['--root', quote(r.typed)]),
   ...(systemArg ? ['--system', quote(systemArg)] : []), ...(register ? ['--register', register] : []),
   ...(opts.fix ? ['--fix'] : []), ...(opts.offline ? ['--offline'] : []), '--widths', viewports.join(',')].join(' ');
 const { version: engineVersion, name: engineName } = PKG;

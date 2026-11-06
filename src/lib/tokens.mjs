@@ -242,6 +242,11 @@ export const floors = {
   textMinPx: value('floors.text-min-px'),
   labelApca: value('floors.label-apca'),
   provenanceAfterWords: value('floors.provenance-after-words'),
+  printBodyMinPt: value('floors.print-body-min-pt'),
+  pacingRunWarn: value('floors.pacing-run-warn'),
+  pacingRunFail: value('floors.pacing-run-fail'),
+  pacingOpenerWarn: value('floors.pacing-opener-warn'),
+  pacingOpenerFail: value('floors.pacing-opener-fail'),
   apcaBodyAdvisory: value('floors.apca-body-advisory'),
   apcaLargeAdvisory: value('floors.apca-large-advisory'),
 };
@@ -355,6 +360,7 @@ export const recipes = Object.fromEntries(Object.entries(ext().recipes).filter((
 export const print = {
   page: { width: dim(tokens.print.page.width.$value), height: dim(tokens.print.page.height.$value) },
   margin: { top: dim(tokens.print.margin.top.$value), bottom: dim(tokens.print.margin.bottom.$value), inline: dim(tokens.print.margin.inline.$value) },
+  body: dim(tokens.print.body.$value),
 };
 
 /** The brand block, if any: name, wordmark asset, self-hosted font files, fonts directory. */

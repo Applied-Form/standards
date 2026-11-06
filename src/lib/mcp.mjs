@@ -25,9 +25,9 @@ import { contrast, requiredContrast, apca } from './contrast.mjs';
 import { colors, floors, registers, spacingScale, fonts, typeScale, aspectRatios, recipes, prohibitions, absent, radiusScale } from './tokens.mjs';
 import { derivePalette } from './palette.mjs';
 import { fromPack } from './pack.mjs';
-import { CLIENT_KEY, TOOL_MAP, deprecated } from './names.mjs';
+import { CLIENT_KEY } from './names.mjs';
 
-export const SERVER = { name: CLIENT_KEY, version: '4.0.1' };
+export const SERVER = { name: CLIENT_KEY, version: '5.0.0' };
 
 export const TOOLS = [
   {
@@ -277,30 +277,8 @@ export const HANDLERS = {
   },
 };
 
-/**
- * The tool list a client sees. The default profile lists the `standards_*` names. The legacy
- * profile lists the `af_*` names and nothing else about the tools differs: it is for a client
- * configured with `af mcp` or `af-mcp`, which has `af_*` in its instructions and allowlists. Both
- * profiles accept both spellings on a call.
- */
-const LEGACY_NAME = Object.fromEntries(Object.entries(TOOL_MAP).map(([old, current]) => [current, old]));
-const toolsFor = (legacy) => (legacy ? TOOLS.map((t) => ({ ...t, name: LEGACY_NAME[t.name] })) : TOOLS);
-
-/** Per process: which old names have already been named on stderr. */
-const toldInThisProcess = new Set();
-const toStderr = (line) => process.stderr.write(`${line}\n`);
-
-/**
- * One JSON-RPC message in, one out, or null for a notification.
- *
- * `profile` is `{ legacy }`: which spelling `tools/list` uses. It is never read from the
- * environment, so a child process cannot inherit it; the entry point passes it from an argument.
- * A call under an old name is answered as the new name would be, with the notice appended as a
- * second content item and, once per name per process, a line on stderr. Under the legacy profile
- * the old names are the ones listed and the entry point has already said once that they are
- * deprecated, so only the item is added. `told` and `warn` are the profile's own, for the tests.
- */
-export async function handle(msg, { legacy = false, told = toldInThisProcess, warn = toStderr } = {}) {
+/** One JSON-RPC message in, one out, or null for a notification. */
+export async function handle(msg) {
   const { id, method, params = {} } = msg ?? {};
   const ok = (result) => ({ jsonrpc: '2.0', id, result });
   const fail = (code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
@@ -308,12 +286,10 @@ export async function handle(msg, { legacy = false, told = toldInThisProcess, wa
   if (method === 'initialize') {
     return ok({ protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: SERVER });
   }
-  if (method === 'tools/list') return ok({ tools: toolsFor(legacy) });
+  if (method === 'tools/list') return ok({ tools: TOOLS });
   if (method === 'tools/call') {
     // Own properties only: a name every object has (constructor, toString) is not a tool.
-    const old = Object.hasOwn(TOOL_MAP, params.name);
-    const current = old ? TOOL_MAP[params.name] : params.name;
-    const handler = Object.hasOwn(HANDLERS, current) ? HANDLERS[current] : null;
+    const handler = Object.hasOwn(HANDLERS, params.name) ? HANDLERS[params.name] : null;
     if (!handler) return fail(-32602, `unknown tool: ${params.name}`);
     let result;
     try {
@@ -322,19 +298,14 @@ export async function handle(msg, { legacy = false, told = toldInThisProcess, wa
       // A failed measurement is a result the model can act on, not a transport error.
       result = { ...text({ error: e.message }), isError: true };
     }
-    if (old) {
-      const line = deprecated(params.name, current);
-      if (!legacy && !told.has(params.name)) { told.add(params.name); warn(line); }
-      result = { ...result, content: [...result.content, { type: 'text', text: line }] };
-    }
     return ok(result);
   }
   if (method === 'notifications/initialized' || id === undefined) return null;
   return fail(-32601, `unknown method: ${method}`);
 }
 
-/** Serve over stdio, one JSON-RPC message per line. `profile` is handle's: `{ legacy }`. */
-export async function serve(stdin = process.stdin, stdout = process.stdout, profile = {}) {
+/** Serve over stdio, one JSON-RPC message per line. */
+export async function serve(stdin = process.stdin, stdout = process.stdout) {
   let buffer = '';
   stdin.setEncoding('utf8');
   for await (const chunk of stdin) {
@@ -346,7 +317,7 @@ export async function serve(stdin = process.stdin, stdout = process.stdout, prof
       if (!line) continue;
       let response;
       try {
-        response = await handle(JSON.parse(line), profile);
+        response = await handle(JSON.parse(line));
       } catch (e) {
         response = { jsonrpc: '2.0', id: null, error: { code: -32700, message: e.message } };
       }

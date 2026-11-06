@@ -51,7 +51,7 @@ rules alone were the whole contribution.
 
 ## Breaking the circularity
 
-**Held-out rules.** The registry has 73 rules in 13 groups. Split by *group*, not by individual
+**Held-out rules.** The registry has 76 rules in 13 groups. Split by *group*, not by individual
 rule, because rules within a group correlate and a random split leaks. Arms E and F are given the
 rules in the disclosed groups only; the score is computed on rules they were never shown.
 
@@ -1623,9 +1623,10 @@ templates follow T1, T2 and T4. None changes a prompt or a lint verdict: none of
 `src/lib/rules/`, `eval/arms.mjs` or `src/lib/page-lint.mjs`, and they reach only the build and test
 scripts, the harness's draft path and the template builder.
 
-**The old names still run.** `af`, `af mcp`, `af-mcp`, the `af_*` tools, `AF_BRAND`, `AF_CHROMIUM`,
-`af.config.json` and `af-baseline.json` work until 5.0.0, each with one line on stderr. A `.af/` path
-named in a config is a plain path and keeps working without a line.
+**The old names ran in 4.x.** `af`, `af mcp`, `af-mcp`, the `af_*` tools, `AF_BRAND`, `AF_CHROMIUM`,
+`af.config.json` and `af-baseline.json` worked, each with one line on stderr. Standards 5.0.0 removed
+them (decision 0029; `docs/migrating-to-5.md` maps each to its replacement). The measurements below were
+taken on 4.0.0, while they still ran.
 
 **The repair-feedback text changed in one place.** The `fix` text of `recipe-mismatch`
 (`src/lib/rules/registry.mjs:65`) said "af move <name> emits the scaffold" and now says "standards move

@@ -20,12 +20,10 @@
  *
  * Set STANDARDS_CHROMIUM to a Chromium executable to skip Playwright's own download.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { pathToFileURL } from 'node:url';
 import { resolve as resolvePath, dirname } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { BASELINE } from '../src/lib/names.mjs';
-import { resolveFile } from '../src/lib/resolve-file.mjs';
 import { systemFromEnv } from '../src/lib/env.mjs';
 import { lintPages, sampledViewports, VIEWPORTS } from '../src/lib/page-lint.mjs';
 import { loadConfig, loadBaseline, buildBaseline, mergeBaseline, applyPolicy, policyNotes, severityOf, splitArgs, pageKey } from '../src/lib/policy.mjs';
@@ -44,9 +42,8 @@ const fail = (e) => { console.error(`error: ${e.message}`); process.exit(2); };
 let config;
 try { config = loadConfig(opt('config', process.cwd())); } catch (e) { fail(e); }
 const writing = flag('baseline-write');
-// The default is looked up only when it is used: a path from the command line or the config is
-// taken as it is, with no fallback to the other name.
-const defaultBaseline = () => config.baseline ?? resolveFile('.', BASELINE.name, BASELINE.legacy).path;
+// The default is looked up only when it is used: a path from the command line or the config is taken as it is.
+const defaultBaseline = () => config.baseline ?? BASELINE.name;
 const baselinePath = writing ? (typeof opts.out === 'string' ? opts.out : defaultBaseline())
   : flag('baseline') ? (typeof opts.baseline === 'string' ? opts.baseline : defaultBaseline())
   : config.baseline;

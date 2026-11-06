@@ -25,7 +25,6 @@
  * `test/compare.test.mjs` holds the fixture results so the claims quoted from them cannot rot
  * silently.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';

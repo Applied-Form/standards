@@ -6,7 +6,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { lint, advise, registerFor, typeTokensFor, ARTEFACT_REGISTER } from '../src/lib/rules.mjs';
 import { colors as c, registers, colorName } from '../src/lib/tokens.mjs';
 import { RULES } from '../src/lib/rules/registry.mjs';
-import { ENV } from '../src/lib/names.mjs';
 
 const rules = (spec) => lint(spec).map((v) => v.rule);
 
@@ -451,7 +450,7 @@ test('a system that permits radius and shadow is held to its own scale', () => {
     }));
   `;
   const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
-    cwd: root, env: { ...process.env, [ENV.STANDARDS_SYSTEM]: undefined, STANDARDS_SYSTEM: root + 'test/fixtures/rounded.tokens.json' }, encoding: 'utf8',
+    cwd: root, env: { ...process.env, STANDARDS_SYSTEM: root + 'test/fixtures/rounded.tokens.json' }, encoding: 'utf8',
   });
   const r = JSON.parse(out);
   assert.deepEqual(r.onScale, [], 'a declared radius and a declared elevation are correct under this system');
@@ -461,7 +460,7 @@ test('a system that permits radius and shadow is held to its own scale', () => {
 });
 
 test('a system named by its file path builds under its file name, never under the path', () => {
-  const dist = (brand) => execFileSync(process.execPath, ['--input-type=module', '-e', `import { DIST } from '${pathToFileURL(root + 'src/lib/build-utils.mjs').href}'; console.log(DIST);`], { env: { ...process.env, [ENV.STANDARDS_SYSTEM]: undefined, STANDARDS_SYSTEM: brand }, encoding: 'utf8' }).trim();
+  const dist = (brand) => execFileSync(process.execPath, ['--input-type=module', '-e', `import { DIST } from '${pathToFileURL(root + 'src/lib/build-utils.mjs').href}'; console.log(DIST);`], { env: { ...process.env, STANDARDS_SYSTEM: brand }, encoding: 'utf8' }).trim();
   assert.equal(dist(root + 'test/fixtures/rounded.tokens.json'), 'dist/brands/rounded/');
   assert.equal(dist('../../escape.json'), 'dist/brands/escape/', 'a relative path cannot climb out of dist/');
   assert.equal(dist('north'), 'dist/brands/north/');
@@ -533,4 +532,40 @@ test('a recipe that cannot fit the page grid says so, and one that fits does not
 
   // Nothing missing is no violation at all, whatever the grids say.
   assert.deepEqual(lint({ register: 'i', background: c.paper, composition: { recipe: [] } }).map((v) => v.rule), []);
+});
+
+test('print body size and pacing: floors, advisories, Register II only', async () => {
+  const { floors, print } = await import('../src/lib/tokens.mjs');
+  const base = { overflowX: 0, linksWithoutHref: [], orphanHeadings: [] };
+  const pacing = (o) => ({ readingPages: 80, openers: [0], longestRun: 10, pagesPerOpener: 10, ...o });
+  const ii = (p) => ({ register: 'ii', print: { ...base, ...p } });
+
+  assert.deepEqual(rules(ii({ bodyPt: floors.printBodyMinPt - 0.1 })), ['print-body-size']);
+  assert.deepEqual(rules(ii({ bodyPt: parseFloat(print.body) })), []);
+
+  assert.deepEqual(rules(ii({ pacing: pacing({ longestRun: floors.pacingRunFail + 1 }) })), ['pacing']);
+  assert.deepEqual(rules(ii({ pacing: pacing({ longestRun: floors.pacingRunFail }) })), []);
+  assert.deepEqual(rules(ii({ pacing: pacing({ pagesPerOpener: floors.pacingOpenerFail + 1 }) })), ['pacing']);
+  assert.deepEqual(rules(ii({ pacing: pacing({ pagesPerOpener: floors.pacingOpenerFail }) })), []);
+  assert.match(lint(ii({ pacing: pacing({ longestRun: floors.pacingRunFail + 1 }) })).find((v) => v.rule === 'pacing').message, /data-part="opener"/);
+
+  const adv = (p) => advise(ii({ pacing: pacing(p) })).map((a) => a.rule);
+  assert.deepEqual(adv({ longestRun: floors.pacingRunWarn + 1 }), ['pacing-advisory']);
+  assert.deepEqual(adv({ longestRun: floors.pacingRunWarn }), []);
+  assert.deepEqual(adv({ pagesPerOpener: floors.pacingOpenerWarn + 1 }), ['pacing-advisory']);
+  assert.deepEqual(adv({ pagesPerOpener: floors.pacingOpenerWarn }), []);
+  assert.deepEqual(adv({ longestRun: floors.pacingRunFail + 1 }), [], 'past the fail line the error speaks, not the advisory');
+
+  const i = { register: 'i', print: { ...base, bodyPt: 1, pacing: pacing({ longestRun: 500, pagesPerOpener: 500 }) } };
+  assert.deepEqual(rules(i), []);
+  assert.deepEqual(advise(i).map((a) => a.rule), []);
+  assert.deepEqual(rules({ register: 'ii', print: base }), [], 'a Register II spec with no pacing measure passes');
+});
+
+test('a document with no declared openers is judged by its run alone, not by pages per opener', async () => {
+  const { floors } = await import('../src/lib/tokens.mjs');
+  const unmarked = (n) => ({ register: 'ii', print: { overflowX: 0, linksWithoutHref: [], orphanHeadings: [], pacing: { readingPages: n, openers: [], longestRun: n, pagesPerOpener: n } } });
+  assert.deepEqual(rules(unmarked(floors.pacingOpenerFail + 1)), [], 'a 46-page document with no markup passes');
+  assert.deepEqual(advise(unmarked(floors.pacingOpenerWarn + 1)).map((a) => a.rule), [], 'and draws no advisory');
+  assert.deepEqual(rules(unmarked(floors.pacingRunFail + 1)), ['pacing'], 'a long one still fails on its run');
 });

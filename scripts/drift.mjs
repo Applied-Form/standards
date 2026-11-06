@@ -16,7 +16,6 @@
  * going back to a site that has moved underneath it. And the survey can be handed to the client
  * as the evidence, so the numbers are auditable rather than trusted.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';

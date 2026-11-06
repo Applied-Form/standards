@@ -6,7 +6,6 @@
  * across at all, and every contrast measurement taken on the way. A pack whose own colours fail
  * a floor is refused with the number, exactly as `standards brand` refuses a hue that cannot work.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { fromPack } from '../src/lib/pack.mjs';

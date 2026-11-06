@@ -13,7 +13,6 @@ import { RULES, LEVELS, resolveLevels } from '../src/lib/rules/registry.mjs';
 import { loadConfig, applyPolicy } from '../src/lib/policy.mjs';
 import { handle } from '../src/lib/mcp.mjs';
 import { launchBrowser } from '../src/lib/page-lint.mjs';
-import { ENV } from '../src/lib/names.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const APPROVED = ['alt-missing', 'contrast', 'focus-hidden', 'horizontal-overflow', 'link-not-underlined',
@@ -22,7 +21,7 @@ const tokenFile = () => JSON.parse(readFileSync(join(ROOT, 'tokens/applied-form.
 const scratch = () => mkdtempSync(join(tmpdir(), 'af-levels-'));
 const writeJson = (dir, name, data) => { const f = join(dir, name); writeFileSync(f, JSON.stringify(data)); return f; };
 const overlay = (mandatory) => ({ $extensions: { 'form.applied': { levels: { mandatory } } } });
-const rulesJson = (env = {}) => spawnSync(process.execPath, [join(ROOT, 'bin/standards.mjs'), 'rules', '--json'], { encoding: 'utf8', env: { ...process.env, [ENV.STANDARDS_SYSTEM]: undefined, ...env } });
+const rulesJson = (env = {}) => spawnSync(process.execPath, [join(ROOT, 'bin/standards.mjs'), 'rules', '--json'], { encoding: 'utf8', env: { ...process.env, ...env } });
 
 test('the levels are read from the token file', () => {
   const declared = tokenFile().$extensions['form.applied'].levels.mandatory;
@@ -90,7 +89,7 @@ const THRESHOLDS = ['body-contrast', 'display-contrast', 'large-text-px', 'large
 const floorsOverlay = (floors) => ({ floors: Object.fromEntries(Object.entries(floors).map(([k, v]) => [k, { $value: v }])) });
 const loadedFloors = (env) => spawnSync(process.execPath, ['--input-type=module', '-e',
   `import { floors } from ${JSON.stringify(new URL('../src/lib/tokens.mjs', import.meta.url).href)}; console.log(JSON.stringify(floors));`],
-{ encoding: 'utf8', env: { ...process.env, [ENV.STANDARDS_SYSTEM]: undefined, ...env } });
+{ encoding: 'utf8', env: { ...process.env, ...env } });
 
 test('a system that lowers a threshold a mandatory rule reads is refused, naming the threshold, both values and 0027', () => {
   const house = tokenFile().floors;
@@ -114,7 +113,7 @@ test('a system named in standards.config.json that relaxes the contrast and text
   writeFileSync(join(dir, 'page.html'), '<!doctype html><html lang="en" data-register="ii"><head><meta charset="utf-8"><title>t</title></head><body><p style="color:#ccc;font-size:9px">x</p></body></html>');
   writeJson(dir, 'overlay.tokens.json', floorsOverlay({ 'body-contrast': 1, 'display-contrast': 1, 'text-min-px': 1 }));
   writeJson(dir, 'standards.config.json', { system: 'overlay.tokens.json' });
-  const env = { ...process.env }; delete env.STANDARDS_SYSTEM; delete env[ENV.STANDARDS_SYSTEM];
+  const env = { ...process.env }; delete env.STANDARDS_SYSTEM;
   const r = spawnSync(process.execPath, [join(ROOT, 'bin/standards.mjs'), 'lint', 'page.html', '--json', '--sample', '0'], { cwd: dir, env, encoding: 'utf8' });
   assert.notEqual(r.status, 0);
   assert.equal(r.stdout, '');
@@ -135,7 +134,7 @@ test('a system that declares a pack but states no pack register is refused befor
     + '<div style="width:2000px;height:10px"></div></body></html>');
   writeJson(dir, 'overlay.tokens.json', packOnly);
   writeJson(dir, 'standards.config.json', { system: 'overlay.tokens.json' });
-  const env = { ...process.env }; delete env.STANDARDS_SYSTEM; delete env[ENV.STANDARDS_SYSTEM];
+  const env = { ...process.env }; delete env.STANDARDS_SYSTEM;
   const lint = spawnSync(process.execPath, [join(ROOT, 'bin/standards.mjs'), 'lint', 'bad.html', '--json', '--sample', '0'], { cwd: dir, env, encoding: 'utf8' });
   assert.notEqual(lint.status, 0, 'standards lint passed the page under a pack with no register');
   assert.equal(lint.stdout, '');
@@ -201,7 +200,7 @@ test('under a brand overlay, a policy that lowers register leaves the mandatory 
     + '<div style="width:2000px">wide</div></body></html>');
   writeJson(dir, 'overlay.tokens.json', overlay(tokenFile().$extensions['form.applied'].levels.mandatory));
   writeJson(dir, 'standards.config.json', { system: 'overlay.tokens.json', rules: { register: 'off' } });
-  const env = { ...process.env }; delete env.STANDARDS_SYSTEM; delete env[ENV.STANDARDS_SYSTEM];
+  const env = { ...process.env }; delete env.STANDARDS_SYSTEM;
   const lint = (...args) => {
     const r = spawnSync(process.execPath, [join(ROOT, 'bin/standards.mjs'), 'lint', 'bad.html', '--json', '--sample', '0', ...args], { cwd: dir, env, encoding: 'utf8' });
     return { status: r.status, pages: JSON.parse(r.stdout).pages, stderr: r.stderr };
@@ -227,7 +226,7 @@ test('with no system loaded, a policy that lowers register leaves the mandatory 
     + '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="64" height="64">'
     + '<div style="width:2000px;height:10px;background:#000"></div></body></html>');
   writeJson(dir, 'standards.config.json', { rules: { register: 'off' } });
-  const env = { ...process.env }; delete env.STANDARDS_SYSTEM; delete env[ENV.STANDARDS_SYSTEM];
+  const env = { ...process.env }; delete env.STANDARDS_SYSTEM;
   const lint = (...args) => {
     const r = spawnSync(process.execPath, [join(ROOT, 'bin/standards.mjs'), 'lint', 'bad.html', '--json', '--sample', '0', ...args], { cwd: dir, env, encoding: 'utf8' });
     return { status: r.status, pages: JSON.parse(r.stdout).pages, stderr: r.stderr };

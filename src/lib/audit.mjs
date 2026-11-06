@@ -271,7 +271,7 @@ export const quote = (s) => (/^[\w./:@,=-]+$/.test(s) ? s : `'${String(s).replac
  * the system as it was typed.
  */
 export function pageCommand({ page = '<page>', roots = [], widths = [], system = null, register = null, fix = false, offline = false }) {
-  return ['npx @appliedform/standards@4 audit', page === '<page>' ? page : quote(page), ...roots.flatMap((r) => ['--root', quote(r)]),
+  return ['npx @appliedform/standards@5 audit', page === '<page>' ? page : quote(page), ...roots.flatMap((r) => ['--root', quote(r)]),
     '--widths', widths.join(','), ...(system ? ['--system', quote(system)] : []), ...(register ? ['--register', register] : []),
     ...(fix ? ['--fix'] : []), ...(offline ? ['--offline'] : [])].join(' ');
 }

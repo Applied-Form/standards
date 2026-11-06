@@ -7,9 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { handle, TOOLS, HANDLERS, SERVER, closeBrowser } from '../src/lib/mcp.mjs';
 import { RULES } from '../src/lib/rules/registry.mjs';
-import { CLIENT_KEY, TOOL_MAP, deprecated } from '../src/lib/names.mjs';
+import { CLIENT_KEY } from '../src/lib/names.mjs';
 
-const call = (name, args = {}, profile) => handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, profile);
+const call = (name, args = {}) => handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
 const payload = (r) => JSON.parse(r.result.content[0].text);
 
 test('the server introduces itself and lists its tools', async () => {
@@ -93,7 +93,7 @@ test('standards_system imports a foreign pack through the same path the CLI uses
 });
 
 test('an unknown tool is an error; a failing tool is a result the model can act on', async () => {
-  const unknown = await handle({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'af_nope' } });
+  const unknown = await handle({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'standards_nope' } });
   assert.equal(unknown.error.code, -32602);
   const broken = await call('standards_lint', {});
   assert.equal(broken.result.isError, true, 'a tool that cannot run says so in its result');
@@ -255,7 +255,7 @@ test('the registry manifest cannot drift from the package or the server', async 
   assert.equal(manifest.packages[0].version, pkg.version, 'the manifest points at an npm version that is not the one this package publishes');
   assert.equal(SERVER.version, pkg.version, 'the server ships inside the package, so it cannot be versioned apart from it');
   assert.equal(manifest.packages[0].identifier, pkg.name, 'the manifest points at a package that is not this one');
-  assert.ok(pkg.bin['af-mcp'], 'the af-mcp shim still installs, for the clients that run it by name');
+  assert.deepEqual(Object.keys(pkg.bin), ['standards'], 'one bin serves the server, as `standards mcp`: the af-mcp bin was removed in 5.0.0');
   // The last namespace segment can be a GitHub organisation, whose capitals the registry keeps.
   assert.match(manifest.name, /^[a-z]+\.[a-z0-9-]+(\.[A-Za-z0-9-]+)*\/[a-z0-9-]+$/, 'reverse-DNS namespace');
   // The registry validates against its schema, which caps both at 100 characters, and checks npm
@@ -265,108 +265,51 @@ test('the registry manifest cannot drift from the package or the server', async 
   assert.equal(pkg.mcpName, manifest.name, 'package.json mcpName must match the server name or the registry refuses ownership');
 });
 
-// The names (decision 0029). The new spelling is `standards_*`; `af_*` is accepted for one major
-// version, and listed only by the legacy profile, which `af mcp` and `af-mcp` ask for.
-const NEW = Object.values(TOOL_MAP);
-const OLD = Object.keys(TOOL_MAP);
-const list = (profile) => handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, profile);
-const noBrowser = process.env.STANDARDS_SKIP_BROWSER ? 'browser skipped' : false;
-/** A profile that records its stderr lines instead of writing them, with its own once-per-name memory. */
-const watched = (legacy = false) => { const lines = []; return { lines, profile: { legacy, told: new Set(), warn: (l) => lines.push(l) } }; };
+// The names (decision 0029). The tools are `standards_*`. The `af_*` names were accepted for one major
+// version and were removed in 5.0.0: they are not listed, not answered, and say nothing on stderr.
+// This block spells them on purpose, to prove that.
+const OLD = ['af_lint', 'af_fix', 'af_rules', 'af_tokens', 'af_contrast', 'af_brand', 'af_move', 'af_system', 'af_drift'];
+const NEW = OLD.map((n) => n.replace(/^af_/, 'standards_'));
 
-test('each profile lists the nine tools, in its own spelling, and neither doubles the list', async () => {
-  const sizes = {};
-  for (const [name, profile, want] of [['standards', undefined, NEW], ['legacy', { legacy: true }, OLD]]) {
-    const r = await list(profile);
-    assert.deepEqual(r.result.tools.map((t) => t.name).sort(), [...want].sort(), `${name} profile`);
-    sizes[name] = JSON.stringify(r.result).length;
-    assert.ok(sizes[name] < 2 * 4615, `${name} profile is ${sizes[name]} bytes; the list was 4615 before the rename`);
+test('the list is the nine standards_* tools, and no af_* name is in it', async () => {
+  const r = await handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
+  assert.deepEqual(r.result.tools.map((t) => t.name).sort(), [...NEW].sort());
+  for (const old of OLD) assert.ok(!r.result.tools.some((t) => t.name === old), `${old} is not listed`);
+  assert.ok(JSON.stringify(r.result).length < 4615 * 1.1, 'the list is no larger than it was before the rename');
+});
+
+test('a call under an af_* name is refused as an unknown tool, with nothing else in the answer', async () => {
+  for (const old of OLD) {
+    const r = await call(old, { foreground: '#1A1A1A', background: '#FFFFFF' });
+    assert.equal(r.error?.code, -32602, `${old}: ${JSON.stringify(r)}`);
+    assert.equal(r.error.message, `unknown tool: ${old}`);
+    assert.equal(r.result, undefined, `${old} reaches no handler`);
   }
-  // The two lists differ in the names and nothing else.
-  const [a, b] = [(await list()).result.tools, (await list({ legacy: true })).result.tools];
-  assert.deepEqual(b.map(({ name, ...rest }) => rest), a.map(({ name, ...rest }) => rest));
+  const current = await call('standards_contrast', { foreground: '#1A1A1A', background: '#FFFFFF' });
+  assert.equal(current.result.content.length, 1, 'the new name carries one item and no notice');
 });
 
-test('a call under either spelling reaches the same handler, under either profile', async () => {
-  const { readFileSync } = await import('node:fs');
-  const pack = JSON.parse(readFileSync(new URL('./fixtures/instrument.tokens.json', import.meta.url), 'utf8'));
-  const args = {
-    standards_rules: { group: 'absence' }, standards_tokens: { group: 'floors' },
-    standards_contrast: { foreground: '#8A3B1C', background: '#FFFFFF' }, standards_brand: { hue: 210, paper: '#F4F7FA' },
-    standards_move: { name: 'colossus' }, standards_system: { pack },
-  };
-  for (const [old, current] of Object.entries(TOOL_MAP)) {
-    if (!args[current]) continue; // the three that open a browser are compared below
-    for (const profile of [undefined, { legacy: true }]) {
-      const a = await call(current, args[current], watched().profile);
-      const b = await call(old, args[current], { ...profile, ...watched(profile?.legacy).profile });
-      assert.deepEqual(b.result.content[0], a.result.content[0], `${old} and ${current} answer alike`);
-      assert.equal(b.result.content[1].text, deprecated(old, current), `${old} carries the notice under either profile`);
-      assert.equal(a.result.content.length, 1, `${current} carries no notice`);
-    }
-  }
+test('a profile argument is not read: the list is the same whatever is passed', async () => {
+  const [a, b] = await Promise.all([handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' }), handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, { legacy: true })]);
+  assert.deepEqual(b, a);
 });
 
-test('the three browser tools answer alike under either spelling', { skip: noBrowser }, async () => {
-  const html = '<!doctype html><html lang="en" data-register="ii"><head><meta charset="utf-8"><title>T</title></head><body><main><h1>Short</h1><p class="card" style="border-radius:9px">Text.</p></main></body></html>';
-  const args = { standards_lint: { html, viewports: [1280] }, standards_fix: { html, viewports: [1280] }, standards_drift: { html: [html] } };
-  try {
-    for (const [old, current] of Object.entries(TOOL_MAP)) {
-      if (!args[current]) continue;
-      const a = await call(current, args[current], watched().profile);
-      const b = await call(old, args[current], watched().profile);
-      assert.equal(b.result.content[0].text, a.result.content[0].text, `${old} and ${current} answer alike`);
-      assert.equal(b.result.content[1].text, deprecated(old, current), `${old} carries the notice`);
-    }
-  } catch (e) {
-    if (/executable|browser|Chromium/i.test(e.message)) return;
-    throw e;
-  }
-});
-
-test('a call under an old name carries the deprecation as a second item, and says it once on stderr', async () => {
-  const { lines, profile } = watched();
-  const args = { foreground: '#1A1A1A', background: '#FFFFFF' };
-  const first = await call('af_contrast', args, profile);
-  const second = await call('af_contrast', args, profile);
-  const current = await call('standards_contrast', args, profile);
-  assert.deepEqual(first.result.content[0], current.result.content[0], 'content[0] is untouched, so a client that parses it still can');
-  assert.deepEqual(first.result.content[1], { type: 'text', text: deprecated('af_contrast', 'standards_contrast') });
-  assert.equal(second.result.content.length, 2, 'every old-name call carries it');
-  assert.equal(current.result.content.length, 1, 'a new-name call carries nothing');
-  assert.deepEqual(lines, [deprecated('af_contrast', 'standards_contrast')], 'one line for the name, however many calls');
-  await call('af_move', {}, profile);
-  assert.equal(lines.length, 2, 'a second old name is a second line');
-  assert.doesNotMatch(lines.join('\n'), /warning/i);
-});
-
-test('the legacy profile leaves stderr alone: the shim has already said so once', async () => {
-  const { lines, profile } = watched(true);
-  const r = await call('af_contrast', { foreground: '#1A1A1A', background: '#FFFFFF' }, profile);
-  assert.deepEqual(lines, []);
-  assert.equal(r.result.content[1].text, deprecated('af_contrast', 'standards_contrast'), 'the result still says it');
-  const current = await call('standards_contrast', { foreground: '#1A1A1A', background: '#FFFFFF' }, profile);
-  assert.equal(current.result.content.length, 1, 'the new name is accepted under the legacy profile too');
-});
-
-test('an unknown name is -32602 under either spelling and either profile, including names every object has', async () => {
-  for (const profile of [undefined, { legacy: true }]) {
-    for (const name of ['standards_nope', 'af_nope', 'nope', 'constructor', 'toString', '__proto__', 'af_', 'standards_']) {
-      const r = await call(name, {}, profile);
-      assert.equal(r.error?.code, -32602, `${name}: ${JSON.stringify(r)}`);
-    }
+test('an unknown name is -32602, including names every object has', async () => {
+  for (const name of ['standards_nope', 'af_nope', 'nope', 'constructor', 'toString', '__proto__', 'af_', 'standards_']) {
+    const r = await call(name, {});
+    assert.equal(r.error?.code, -32602, `${name}: ${JSON.stringify(r)}`);
   }
 });
 
 test('an error names the tool the caller used', async () => {
   const cases = [
-    ['standards_lint', {}, /standards_lint needs html or url/], ['af_lint', {}, /af_lint needs html or url/],
-    ['standards_fix', {}, /standards_fix needs html/], ['af_fix', {}, /af_fix needs html/],
-    ['standards_fix', { url: 'file:///etc/hosts' }, /standards_fix takes html only/], ['af_fix', { url: 'file:///etc/hosts' }, /af_fix takes html only/],
-    ['standards_drift', {}, /standards_drift needs html or urls/], ['af_drift', {}, /af_drift needs html or urls/],
+    ['standards_lint', {}, /standards_lint needs html or url/],
+    ['standards_fix', {}, /standards_fix needs html/],
+    ['standards_fix', { url: 'file:///etc/hosts' }, /standards_fix takes html only/],
+    ['standards_drift', {}, /standards_drift needs html or urls/],
   ];
   for (const [name, args, message] of cases) {
-    const r = await call(name, args, watched().profile);
+    const r = await call(name, args);
     assert.equal(r.result.isError, true, name);
     assert.match(payload(r).error, message, name);
   }

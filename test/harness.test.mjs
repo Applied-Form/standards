@@ -20,7 +20,6 @@ import { launchBrowser } from '../src/lib/page-lint.mjs';
 import { generate, extractHtml } from '../eval/providers.mjs';
 import { score, paletteFrom, normalise } from '../eval/score.mjs';
 import { classifyFailure, harnessFingerprint, fileSafe } from '../eval/run.mjs';
-import { ENV } from '../src/lib/names.mjs';
 
 let browser = null, launchError = null;
 try { browser = await launchBrowser(); } catch (e) { launchError = e; if (process.env.CI) throw e; }
@@ -78,7 +77,7 @@ test('a run measures the system the model was given, and keeps what the model co
   // Meridian's, and recorded no token usage because the scorer's result overwrote it. One stub cell
   // through the real entry point holds all three: the system, the cost, and the drift.
   const out = join(dir, 'run', 'r.jsonl');
-  const r = spawnSync(process.execPath, ['eval/run.mjs', '--models', 'stub', '--briefs', 'b01', '--arms', 'components', '--samples', '1', '--out', out], { encoding: 'utf8', env: { ...process.env, [ENV.STANDARDS_SYSTEM]: undefined, STANDARDS_SYSTEM: '' } });
+  const r = spawnSync(process.execPath, ['eval/run.mjs', '--models', 'stub', '--briefs', 'b01', '--arms', 'components', '--samples', '1', '--out', out], { encoding: 'utf8', env: { ...process.env, STANDARDS_SYSTEM: '' } });
   assert.equal(r.status, 0, r.stderr);
   const merged = JSON.parse(readFileSync('eval/fixtures/meridian.merged.tokens.json', 'utf8'));
   assert.match(r.stdout, new RegExp(`study system: .*meridian\\.merged\\.tokens\\.json \\(paper ${merged.color.paper.$value.hex}\\)`));

@@ -14,7 +14,6 @@
  * it is scored on, and the held-out split — the whole defence against circularity — would be gone.
  * `disclosedOnly()` below is that filter, and it is the single most load-bearing line in the file.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';

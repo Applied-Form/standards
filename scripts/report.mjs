@@ -12,7 +12,6 @@
  * --history <path> override the history file (default dist/compliance-history.json)
  * --stamp <iso>    stamp this run with a given ISO timestamp (default: now)
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

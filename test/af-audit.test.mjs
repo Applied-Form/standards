@@ -21,7 +21,7 @@ import { registers, spreads } from '../src/lib/tokens.mjs';
 import { parseScope, loadScope, offendingValue, findingsOf, pageEntry, aggregate, buildReport, rulesChecked, findingKey, systemOf, GATED_ON_II, PRINTED_IN_II, OFF_II, REFUSED } from '../src/lib/audit.mjs';
 import { renderReport, houseCss, isReport } from '../src/lib/audit-html.mjs';
 import { resolveSystem } from '../src/lib/system-arg.mjs';
-import { CONFIG, ENV } from '../src/lib/names.mjs';
+import { CONFIG } from '../src/lib/names.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const STANDARDS_BIN = join(ROOT, 'bin/standards.mjs');
@@ -32,7 +32,7 @@ try { browser = await launchBrowser(); } catch (e) { launchError = e; if (proces
 const skip = browser ? false : `no Chromium: ${launchError?.message.split('\n')[0]}`;
 after(() => browser?.close());
 
-const env = () => { const e = { ...process.env }; delete e.STANDARDS_SYSTEM; delete e[ENV.STANDARDS_SYSTEM]; return e; };
+const env = () => { const e = { ...process.env }; delete e.STANDARDS_SYSTEM; return e; };
 const standards = (args, cwd, bin = STANDARDS_BIN) => spawnSync(process.execPath, [bin, 'audit', ...args], { cwd, encoding: 'utf8', env: env(), timeout: 600000 });
 /** As standards, without blocking this process, so a server the test runs can answer the pages. */
 const standardsAsync = (args, cwd) => new Promise((done) => {
@@ -305,7 +305,7 @@ test('the rules left out for Register I are the ones the linter runs only in Reg
   }
 });
 
-const meta = { system: { label: 'test system', version: '1.0.0', scope: 'system' }, engine: { name: 'engine', version: '9.9.9' }, register: null, widths: [320, 1280], sampled: [], seed: null, fix: true, generated: '2026-10-16T09:00:00.000Z', command: 'npx @appliedform/standards@4 audit pages/ --widths 320,1280 --fix' };
+const meta = { system: { label: 'test system', version: '1.0.0', scope: 'system' }, engine: { name: 'engine', version: '9.9.9' }, register: null, widths: [320, 1280], sampled: [], seed: null, fix: true, generated: '2026-10-16T09:00:00.000Z', command: 'npx @appliedform/standards@5 audit pages/ --widths 320,1280 --fix' };
 
 test('a page measured without its stylesheet, script or font is incomplete and never counted clean; an image that failed is listed only', () => {
   const css = { resource: 'css/site.css', type: 'stylesheet', why: 'HTTP 404' };
@@ -386,27 +386,27 @@ test('the one-page command measures a page as the run did: widths, system, regis
     for (const offline of [false, true]) {
       const pages = [pageEntry({ input: 'one.html', initial: [at(320, [])], ...(fix ? { after: [at(320, [])], fix: { applied: [], refused: [], fixed: [] } } : {}) })];
       const r = buildReport({ pages, ...meta, fix, offline, register: 'ii', roots: ['shared assets'], system: { label: 'pack.tokens.json', arg: 'pack.tokens.json', version: null, scope: 'pack' } });
-      const want = `npx @appliedform/standards@4 audit <page> --root 'shared assets' --widths 320,1280 --system pack.tokens.json --register ii${fix ? ' --fix' : ''}${offline ? ' --offline' : ''}`;
+      const want = `npx @appliedform/standards@5 audit <page> --root 'shared assets' --widths 320,1280 --system pack.tokens.json --register ii${fix ? ' --fix' : ''}${offline ? ' --offline' : ''}`;
       assert.equal(r.pageCommand, want);
       const html = renderReport(r, { css: '' });
       assert.ok(html.includes(`One page at a time: <span data-voice="data">${want.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>.`), html.match(/One page at a time:.*/)?.[0]);
       // standards fix writes the fixes; it is named for that, and not as the command that repeats the audit.
-      assert.equal(/To write a page's fixes: <span data-voice="data">npx @appliedform\/standards@4 fix &lt;page&gt; --widths 320,1280 --system pack\.tokens\.json --register ii<\/span>/.test(html), fix);
+      assert.equal(/To write a page's fixes: <span data-voice="data">npx @appliedform\/standards@5 fix &lt;page&gt; --widths 320,1280 --system pack\.tokens\.json --register ii<\/span>/.test(html), fix);
       // The provenance names the --root directories as every path in the report is named, and says what a page could read.
       assert.deepEqual(r.roots, ['shared assets']);
       assert.match(html, /Local files: a page from a file could read its own directory and below, the directories named, the --root directory shared assets and the Standards package's files; any other file it asked for was refused/);
     }
   }
   const shownApart = buildReport({ pages: [pageEntry({ input: 'one.html', initial: [at(320, [])] })], ...meta, fix: false, roots: ['/home/me/assets', '../fonts'], rootsShown: ['assets', 'fonts'] });
-  assert.deepEqual([shownApart.roots, shownApart.pageCommand], [['assets', 'fonts'], 'npx @appliedform/standards@4 audit <page> --root /home/me/assets --root ../fonts --widths 320,1280']);
+  assert.deepEqual([shownApart.roots, shownApart.pageCommand], [['assets', 'fonts'], 'npx @appliedform/standards@5 audit <page> --root /home/me/assets --root ../fonts --widths 320,1280']);
   assert.match(renderReport(shownApart, { css: '' }), /the --root directories assets, fonts and the Standards package's files/);
   assert.match(renderReport(buildReport({ pages: shownApart.pages, ...meta, fix: false }), { css: '' }), /could read its own directory and below, the directories named and the Standards package's files/);
   // A page that could read a directory named above its own carries its own command, with that directory.
-  const own = pageEntry({ input: 'site/pages/a.html', initial: [at(320, [])], command: 'npx @appliedform/standards@4 audit site/pages/a.html --root site --widths 320,1280' });
-  const plain = pageEntry({ input: 'site/b.html', initial: [at(320, [])], command: 'npx @appliedform/standards@4 audit site/b.html --widths 320,1280' });
+  const own = pageEntry({ input: 'site/pages/a.html', initial: [at(320, [])], command: 'npx @appliedform/standards@5 audit site/pages/a.html --root site --widths 320,1280' });
+  const plain = pageEntry({ input: 'site/b.html', initial: [at(320, [])], command: 'npx @appliedform/standards@5 audit site/b.html --widths 320,1280' });
   const html = renderReport(buildReport({ pages: [own, plain], ...meta, fix: false }), { css: '' });
-  assert.match(html, /A page that could read a directory named above its own, or read a file in another directory named, is given that directory with <code>--root<\/code>: <span data-voice="data">npx @appliedform\/standards@4 audit site\/pages\/a\.html --root site --widths 320,1280<\/span>\./);
-  assert.doesNotMatch(html, /npx @appliedform\/standards@4 audit site\/b\.html/, 'a page the one-page command measures as it is needs no command of its own in the report');
+  assert.match(html, /A page that could read a directory named above its own, or read a file in another directory named, is given that directory with <code>--root<\/code>: <span data-voice="data">npx @appliedform\/standards@5 audit site\/pages\/a\.html --root site --widths 320,1280<\/span>\./);
+  assert.doesNotMatch(html, /npx @appliedform\/standards@5 audit site\/b\.html/, 'a page the one-page command measures as it is needs no command of its own in the report');
 });
 
 test('rule overrides in the project config are named in the provenance as not applied', () => {
@@ -520,7 +520,7 @@ test('the report is written as one self-contained file', { skip }, () => {
   assert.match(html, /class="af-provenance"/);
   assert.match(html, /not a WCAG/);
   assert.match(html, /missing\.html/);
-  assert.match(html, /npx @appliedform\/standards@4 audit site site\/test\/fixtures\/report\/missing\.html --fix --widths 320,1280/);
+  assert.match(html, /npx @appliedform\/standards@5 audit site site\/test\/fixtures\/report\/missing\.html --fix --widths 320,1280/);
   assert.match(html, /<meta name="generator" content="standards audit">/);
 });
 
@@ -710,12 +710,12 @@ test('the one-page command gives a directory named beside the page only when the
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const json = JSON.parse(r.stdout);
   assert.deepEqual(json.pages.map((p) => [p.name, p.failed, p.command]), [
-    ['a/index.html', [], 'npx @appliedform/standards@4 audit ../a/index.html --root ../b --widths 320'],
-    ['b/index.html', [], 'npx @appliedform/standards@4 audit ../b/index.html --widths 320'],
+    ['a/index.html', [], 'npx @appliedform/standards@5 audit ../a/index.html --root ../b --widths 320'],
+    ['b/index.html', [], 'npx @appliedform/standards@5 audit ../b/index.html --widths 320'],
   ]);
   // Each command, run where the set was run, measures its page as the set did and names it the same way.
   for (const p of json.pages) {
-    const again = standards([...p.command.replace(/^npx @appliedform\/standards@4 audit /, '').split(' '), '--json'], client);
+    const again = standards([...p.command.replace(/^npx @appliedform\/standards@5 audit /, '').split(' '), '--json'], client);
     assert.equal(again.status, 0, again.stdout + again.stderr);
     const [q] = JSON.parse(again.stdout).pages;
     assert.deepEqual([q.name, q.failed, q.findings, q.command], [p.name, p.failed, p.findings, p.command]);
@@ -739,17 +739,17 @@ test('a page in a directory named loads ../css from inside it; named alone, it i
   assert.match(p.findings.find((f) => f.rule === 'contrast')?.values.join(' ') ?? '', /#d0d0d0/i, JSON.stringify(p.findings));
   // The page read the directory named above its own, so the command that measures it alone names
   // that directory with --root, and measures what the set did.
-  assert.equal(p.command, 'npx @appliedform/standards@4 audit site/pages/index.html --root site --widths 320');
+  assert.equal(p.command, 'npx @appliedform/standards@5 audit site/pages/index.html --root site --widths 320');
   assert.ok(readFileSync(wholeOut, 'utf8').includes(`<span data-voice="data">${p.command}</span>`), 'the report gives the page its own command');
-  const again = standards([...p.command.replace(/^npx @appliedform\/standards@4 audit /, '').split(' '), '--json'], dir);
+  const again = standards([...p.command.replace(/^npx @appliedform\/standards@5 audit /, '').split(' '), '--json'], dir);
   assert.equal(again.status, whole.status, again.stdout + again.stderr);
   const [q1] = JSON.parse(again.stdout).pages;
   assert.deepEqual([q1.loaded, q1.incomplete, q1.failed, q1.findings], [p.loaded, p.incomplete, p.failed, p.findings]);
   // --offline and --root reach both commands.
   const offline = JSON.parse(standards(['site', '--root', 'site/css', '--offline', '--widths', '320', '--json'], dir).stdout);
-  assert.equal(offline.command, 'npx @appliedform/standards@4 audit site --root site/css --offline --widths 320');
-  assert.equal(offline.pageCommand, 'npx @appliedform/standards@4 audit <page> --root site/css --widths 320 --offline');
-  assert.equal(offline.pages[0].command, 'npx @appliedform/standards@4 audit site/pages/index.html --root site --root site/css --widths 320 --offline');
+  assert.equal(offline.command, 'npx @appliedform/standards@5 audit site --root site/css --offline --widths 320');
+  assert.equal(offline.pageCommand, 'npx @appliedform/standards@5 audit <page> --root site/css --widths 320 --offline');
+  assert.equal(offline.pages[0].command, 'npx @appliedform/standards@5 audit site/pages/index.html --root site --root site/css --widths 320 --offline');
   // Named alone it reads site/pages only, so both stylesheets one directory up are refused.
   const out = join(dir, 'alone.html');
   const alone = standards(['site/pages/index.html', '--widths', '320', '--json', '--out', out], dir);
@@ -1113,8 +1113,8 @@ test('the report carries no absolute path outside the command that repeats it, n
   // The site outside the working directory, typed in full and as a path from it; the system from
   // standards.config.json, then typed in full. The command carries what was typed, so it runs as it reads.
   const runs = [
-    { args: [root], command: `npx @appliedform/standards@4 audit ${root} --system system.json --widths 320` },
-    { args: ['../site', '--system', typed], command: `npx @appliedform/standards@4 audit ../site --system ${typed} --widths 320` },
+    { args: [root], command: `npx @appliedform/standards@5 audit ${root} --system system.json --widths 320` },
+    { args: ['../site', '--system', typed], command: `npx @appliedform/standards@5 audit ../site --system ${typed} --widths 320` },
   ];
   const withoutCommands = (html) => html.replace(/<pre class="af-code"[\s\S]*?<\/pre>/, '').replace(/<p>One page at a time: .*<\/p>/, '');
   for (const { args, command } of runs) {
@@ -1137,20 +1137,20 @@ test('the report carries no absolute path outside the command that repeats it, n
     assert.deepEqual(json.policy, { applied: false, overrides: { 'shadow-present': 'off' } });
     assert.match(html, /shadow-present: off in the project's config, not applied/);
     // The command repeats the run from where it was made.
-    const again = standards([...json.command.replace(/^npx @appliedform\/standards@4 audit /, '').split(' '), '--json'], client);
+    const again = standards([...json.command.replace(/^npx @appliedform\/standards@5 audit /, '').split(' '), '--json'], client);
     assert.equal(again.status, 0, again.stdout + again.stderr);
     assert.equal(JSON.parse(again.stdout).aggregate.loaded, 1);
     // So does the page's own command, which gives the site named above it with --root, and the
     // page is named as the set named it, from the site's parent.
-    const one = standards([...json.pages[0].command.replace(/^npx @appliedform\/standards@4 audit /, '').split(' '), '--json'], client);
+    const one = standards([...json.pages[0].command.replace(/^npx @appliedform\/standards@5 audit /, '').split(' '), '--json'], client);
     assert.equal(one.status, 0, one.stdout + one.stderr);
     assert.deepEqual(JSON.parse(one.stdout).pages.map((p) => [p.name, p.command]), [[json.pages[0].name, json.pages[0].command]]);
   }
-  assert.match(readFileSync(join(client, 'report.html'), 'utf8'), new RegExp(`npx @appliedform/standards@4 audit &lt;page&gt; --widths 320 --system ${typed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+  assert.match(readFileSync(join(client, 'report.html'), 'utf8'), new RegExp(`npx @appliedform/standards@5 audit &lt;page&gt; --widths 320 --system ${typed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
 });
 
-test('the overrides note names the config file the project has, old name or new; the report names none', { skip }, () => {
-  for (const name of [CONFIG.name, CONFIG.legacy]) {
+test('the overrides note names the config file the project has; the report names none', { skip }, () => {
+  for (const name of [CONFIG.name]) {
     const dir = workspace();
     site(['clean.html'], dir);
     writeFileSync(join(dir, name), JSON.stringify({ rules: { 'shadow-present': 'off' } }));
@@ -1160,7 +1160,7 @@ test('the overrides note names the config file the project has, old name or new;
     assert.ok(r.stderr.includes(`standards audit: ${name} sets shadow-present: off; the report does not apply rule overrides, and checks every rule it lists\n`), r.stderr);
     const html = readFileSync(out, 'utf8');
     assert.match(html, /Rule overrides: shadow-present: off in the project's config, not applied/);
-    assert.doesNotMatch(html, new RegExp([CONFIG.name, CONFIG.legacy].map((n) => n.replace(/\./g, '\\.')).join('|')), 'the report names a file the project may not have');
+    assert.doesNotMatch(html, new RegExp([CONFIG.name].map((n) => n.replace(/\./g, '\\.')).join('|')), 'the report names a file the project may not have');
   }
 });
 
