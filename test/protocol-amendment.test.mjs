@@ -21,15 +21,11 @@ try { browser = await launchBrowser(); } catch (e) { launchError = e; if (proces
 if (browser) await browser.close();
 const skip = browser ? false : `no Chromium: ${launchError?.message.split('\n')[0]}`;
 
-// No system variable, new name or old: the amendment's run set none. The Chromium setting is kept, under
-// the new name whichever name it was set under, so the child finds the same browser the probe above
-// found. This file spells the old names out on purpose, and is exempt from the old-name greps beside
-// compat.test.mjs and names.test.mjs: the 5.0.0 removal sweep must see it.
-const SYSTEM_NAMES = ['STANDARDS_SYSTEM', 'AF_BRAND'];
-const OLD_CHROMIUM = 'AF_CHROMIUM';
+// No system variable: the amendment's run set none. The Chromium setting is kept, so the child finds the same
+// browser the probe above found.
 const env = () => {
   const chromium = chromiumFromEnv();
-  const kept = Object.entries(process.env).filter(([k]) => ![...SYSTEM_NAMES, OLD_CHROMIUM, 'STANDARDS_CHROMIUM'].includes(k));
+  const kept = Object.entries(process.env).filter(([k]) => !['STANDARDS_SYSTEM', 'STANDARDS_CHROMIUM'].includes(k));
   return { ...Object.fromEntries(kept), ...(chromium === undefined ? {} : { STANDARDS_CHROMIUM: chromium }) };
 };
 const scratch = mkdtempSync(join(tmpdir(), 'standards-amendment-'));

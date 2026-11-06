@@ -6,7 +6,6 @@
  * With --out the result is a brand overlay (system colour names plus the brand block), ready for
  * STANDARDS_SYSTEM=<key> npm run build:brand. Without it, the roles and their measurements are printed.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { writeFileSync } from 'node:fs';
 import { derivePalette, toOverlay } from '../src/lib/palette.mjs';
 

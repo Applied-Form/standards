@@ -231,7 +231,7 @@ ${table(`Fixes refused on ${p.name}`, ['Element', 'Declarations', 'Rules', 'Reas
   const one = report.pageCommand ?? pageCommand({ ...report, roots: [], system: report.system?.arg ?? null });
   const roots = (c) => (String(c).match(/ --root /g) ?? []).length;
   const own = report.pages.filter((p) => p.command && roots(p.command) > roots(one));
-  const writer = [`npx @appliedform/standards@4 fix <page>`, '--widths', report.widths.join(','),
+  const writer = [`npx @appliedform/standards@5 fix <page>`, '--widths', report.widths.join(','),
     ...(report.system?.arg ? ['--system', quote(report.system.arg)] : []),
     ...(report.register ? ['--register', report.register] : [])].join(' ');
   const alone = [`One page at a time: ${d(one)}.`,

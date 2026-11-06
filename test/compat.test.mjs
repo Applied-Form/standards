@@ -1,8 +1,8 @@
 /**
- * What the product's names promise. Standards by Applied Form is the command `standards`; the older
- * `af` still runs for one major version, says so once on stderr, and otherwise behaves exactly as
- * `standards` does. After the rename sweep this is the one test file allowed to spell the old
- * command.
+ * What the product's names promise. Standards by Applied Form is the command `standards`, and its
+ * system and Chromium are chosen by `STANDARDS_SYSTEM` and `STANDARDS_CHROMIUM`. The older `af`,
+ * `af-mcp`, `AF_BRAND` and `AF_CHROMIUM` were removed in 5.0.0 (decision 0029): this is one of the
+ * files allowed to spell them, to prove that they do nothing now.
  *
  * It uses only files the open export carries (fixtures by path, never brands/), so the open
  * repository runs it too.
@@ -12,16 +12,13 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, copyFileSync, readFileSync, readdirSync, chmodSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname, normalize } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launchBrowser } from '../src/lib/page-lint.mjs';
 import { isReport } from '../src/lib/audit-html.mjs';
-import { deprecated, TOOL_MAP } from '../src/lib/names.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const AF = join(root, 'bin/af.mjs');
 const STANDARDS = join(root, 'bin/standards.mjs');
-const AF_MCP = join(root, 'bin/af-mcp.mjs');
 const FIXTURES = join(root, 'test/fixtures');
 
 let browser = null, launchError = null;
@@ -29,48 +26,31 @@ try { browser = await launchBrowser(); } catch (e) { launchError = e; if (proces
 const skip = browser ? false : `no Chromium: ${launchError?.message.split('\n')[0]}`;
 await browser?.close();
 
-// A run starts with neither name of any pair set; a test sets the ones it is about.
-const env = () => { const e = { ...process.env }; for (const k of ['AF_BRAND', 'STANDARDS_SYSTEM', 'AF_CHROMIUM', 'STANDARDS_CHROMIUM']) delete e[k]; return e; };
+// A run starts with no system of either spelling and no old Chromium name; a test sets the ones it is about. The
+// person's own STANDARDS_CHROMIUM stays, so that a child finds the browser this file found.
+const env = () => { const e = { ...process.env }; for (const k of ['AF_BRAND', 'STANDARDS_SYSTEM', 'AF_CHROMIUM']) delete e[k]; return e; };
 const run = (bin, args = []) => spawnSync(process.execPath, [bin, ...args], { encoding: 'utf8', env: env() });
 
-test('af rules --json writes what standards rules --json writes, and says once that af is deprecated', () => {
+test('standards rules --json writes JSON and nothing to stderr; an unknown command exits 2, and bare standards exits 0', () => {
   const now = run(STANDARDS, ['rules', '--json']);
-  const old = run(AF, ['rules', '--json']);
   assert.equal(now.status, 0, now.stderr);
-  assert.equal(old.status, 0, old.stderr);
   assert.doesNotThrow(() => JSON.parse(now.stdout));
-  assert.equal(old.stdout, now.stdout, 'the old command is the new command under another name');
-  assert.equal(now.stderr, '', 'the new command prints nothing to stderr');
-  assert.equal(old.stderr, `${deprecated('af', 'standards')}\n`, 'the old command prints exactly the one line');
-});
-
-test('af with an unknown command exits 2 with nothing on stdout, and bare af exits 0', () => {
-  const nope = run(AF, ['nope']);
+  assert.equal(now.stderr, '', 'the command prints nothing to stderr');
+  const nope = run(STANDARDS, ['nope']);
   assert.equal(nope.status, 2);
   assert.equal(nope.stdout, '');
-  assert.ok(nope.stderr.startsWith(`${deprecated('af', 'standards')}\n`), nope.stderr);
-  assert.match(nope.stderr, /usage: standards </);
-  const bare = run(AF);
-  assert.equal(bare.status, 0, 'bare af prints usage and exits 0, as it always has');
-  assert.equal(bare.stdout, '');
-  const now = run(STANDARDS);
-  assert.equal(now.status, 0);
-  assert.match(now.stderr, /^usage: standards </);
+  assert.match(nope.stderr, /^usage: standards </);
+  const bare = run(STANDARDS);
+  assert.equal(bare.status, 0, 'bare standards prints usage and exits 0');
+  assert.match(bare.stderr, /^usage: standards </);
 });
 
-test('standards mcp, af mcp and af-mcp --selftest all pass; only the old routes say they are deprecated', () => {
+test('standards mcp --selftest passes, calling the tools by the names the server lists, with nothing on stderr', () => {
   const now = run(STANDARDS, ['mcp', '--selftest']);
   assert.equal(now.status, 0, now.stdout + now.stderr);
   assert.match(now.stdout.trim().split('\n').pop(), /protocol clean$/);
-  assert.match(now.stdout, /standards_rules/, 'the selftest calls the tools by the names the profile lists');
+  assert.match(now.stdout, /standards_rules/);
   assert.equal(now.stderr, '');
-  for (const [bin, args, line] of [[AF, ['mcp', '--selftest'], deprecated('af', 'standards')], [AF_MCP, ['--selftest'], deprecated('af-mcp', 'standards mcp')]]) {
-    const old = run(bin, args);
-    assert.equal(old.status, 0, old.stdout + old.stderr);
-    assert.match(old.stdout.trim().split('\n').pop(), /protocol clean$/);
-    assert.match(old.stdout, /af_rules/, 'a legacy route is selftested under the names it lists');
-    assert.equal(old.stderr, `${line}\n`, 'one line, however many tools the selftest calls');
-  }
 });
 
 /**
@@ -94,32 +74,34 @@ const hello = [
   { id: 2, method: 'tools/list', params: {} },
 ];
 
-for (const [route, bin, args, expected, stderr] of [
-  ['standards mcp', STANDARDS, ['mcp'], Object.values(TOOL_MAP), ''],
-  ['af mcp', AF, ['mcp'], Object.keys(TOOL_MAP), `${deprecated('af', 'standards')}\n`],
-  ['af-mcp', AF_MCP, [], Object.keys(TOOL_MAP), `${deprecated('af-mcp', 'standards mcp')}\n`],
-]) {
-  test(`a stdio session over ${route} is clean protocol and lists ${expected[0].replace(/_.*/, '_*')} tools`, async () => {
-    const r = await session(bin, args, hello);
-    assert.equal(r.status, 0, r.err);
-    assert.equal(r.lines.length, 2, 'one answer for initialize and one for tools/list');
-    for (const line of r.lines) assert.equal(JSON.parse(line).jsonrpc, '2.0', line);
-    const tools = JSON.parse(r.lines[1]).result.tools.map((t) => t.name);
-    assert.deepEqual([...tools].sort(), [...expected].sort());
-    assert.equal(r.err, stderr);
-  });
-}
-
-test('an old tool name over stdio is answered, carries the notice, and is named on stderr once', async () => {
-  const call = (id) => ({ id, method: 'tools/call', params: { name: 'af_contrast', arguments: { foreground: '#1A1A1A', background: '#FFFFFF' } } });
-  const r = await session(STANDARDS, ['mcp'], [...hello, call(3), call(4)]);
+test('a stdio session over standards mcp is clean protocol and lists the standards_* tools', async () => {
+  const r = await session(STANDARDS, ['mcp'], hello);
   assert.equal(r.status, 0, r.err);
-  assert.equal(r.lines.length, 4);
+  assert.equal(r.lines.length, 2, 'one answer for initialize and one for tools/list');
   for (const line of r.lines) assert.equal(JSON.parse(line).jsonrpc, '2.0', line);
-  const [a, b] = [JSON.parse(r.lines[2]), JSON.parse(r.lines[3])];
-  assert.equal(a.result.content[1].text, deprecated('af_contrast', 'standards_contrast'));
-  assert.equal(b.result.content.length, 2);
-  assert.equal(r.err, `${deprecated('af_contrast', 'standards_contrast')}\n`);
+  const tools = JSON.parse(r.lines[1]).result.tools.map((t) => t.name);
+  assert.equal(tools.length, 9);
+  for (const name of tools) assert.match(name, /^standards_/);
+  assert.equal(r.err, '');
+});
+
+test('a call under an af_* name over stdio is an unknown tool, and nothing is written to stderr', async () => {
+  const call = (id) => ({ id, method: 'tools/call', params: { name: 'af_contrast', arguments: { foreground: '#1A1A1A', background: '#FFFFFF' } } });
+  const r = await session(STANDARDS, ['mcp'], [...hello, call(3)]);
+  assert.equal(r.status, 0, r.err);
+  assert.equal(JSON.parse(r.lines[2]).error.message, 'unknown tool: af_contrast');
+  assert.equal(r.err, '');
+});
+
+test('the legacy tool-list argument is not read: standards mcp lists the standards_* tools whatever it is given', async () => {
+  const r = await session(STANDARDS, ['mcp', '--legacy-tool-names'], hello);
+  assert.equal(r.status, 0, r.err);
+  assert.ok(JSON.parse(r.lines[1]).result.tools.every((t) => t.name.startsWith('standards_')));
+  assert.equal(r.err, '');
+});
+
+test('the old commands af and af-mcp are not in the tree', () => {
+  for (const file of ['bin/af.mjs', 'bin/af-mcp.mjs']) assert.equal(existsSync(join(root, file)), false, file);
 });
 
 test('a report is recognised by any of the three generator values it has carried', () => {
@@ -138,13 +120,11 @@ test('lint --json writes nothing but JSON to stdout, with the sampled widths lef
 });
 
 /**
- * The environment names (Q2, stage 6). `STANDARDS_SYSTEM` and `STANDARDS_CHROMIUM` replace `AF_BRAND`
- * and `AF_CHROMIUM`; the old names still work for one major version, resolved on every read, with
- * one stderr line. The system is `test/fixtures/rounded.tokens.json`, a fixture the open export
- * carries, never a name under brands/.
+ * The environment names. `STANDARDS_SYSTEM` and `STANDARDS_CHROMIUM` are the only ones read, on every use.
+ * `AF_BRAND` and `AF_CHROMIUM` were removed in 5.0.0. The system is `test/fixtures/rounded.tokens.json`,
+ * a fixture the open export carries, never a name under brands/.
  */
 const ROUNDED = join(FIXTURES, 'rounded.tokens.json');
-const lines = (stderr, name) => stderr.split('\n').filter((l) => l.startsWith(`${name} is deprecated`));
 const runWith = (bin, args, set, cwd = root) => spawnSync(process.execPath, [bin, ...args], { encoding: 'utf8', env: { ...env(), ...set }, cwd });
 const scratch = () => mkdtempSync(join(tmpdir(), 'standards-compat-'));
 const child = (code, set = {}) => spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', env: { ...env(), ...set }, cwd: root });
@@ -153,134 +133,110 @@ const href = (rel) => JSON.stringify(pathToFileURL(join(root, rel)).href);
 const verdict = (r) => { const { config, ...rest } = JSON.parse(r.stdout); return rest; };
 const lintArgs = ['lint', join(FIXTURES, 'violations.html'), '--json', '--sample', '0'];
 
-test('AF_BRAND is read like STANDARDS_SYSTEM, with exactly one line', () => {
-  const now = runWith(STANDARDS, ['rules', '--json'], { STANDARDS_SYSTEM: ROUNDED });
-  const old = runWith(STANDARDS, ['rules', '--json'], { AF_BRAND: ROUNDED });
-  assert.equal(now.status, 0, now.stderr);
-  assert.equal(old.status, 0, old.stderr);
-  assert.equal(old.stdout, now.stdout);
-  assert.equal(now.stderr, '', 'the new name says nothing');
-  assert.equal(old.stderr, `${deprecated('AF_BRAND', 'STANDARDS_SYSTEM')}\n`, 'the old name says one line');
+// The system a process loads its tokens for: tokens.mjs reads it when it is imported.
+const systemOf = (set) => {
+  const r = child(`const { brand } = await import(${href('src/lib/tokens.mjs')}); console.log(JSON.stringify(brand));`, set);
+  assert.equal(r.status, 0, r.stderr);
+  return { brand: JSON.parse(r.stdout), stderr: r.stderr };
+};
+
+test('STANDARDS_SYSTEM names the system, with nothing on stderr; the library does not read AF_BRAND (the command refuses it: test/removed-names.test.mjs)', () => {
+  assert.deepEqual(systemOf({ STANDARDS_SYSTEM: ROUNDED }), { brand: ROUNDED, stderr: '' });
+  assert.deepEqual(systemOf({ AF_BRAND: ROUNDED }), { brand: null, stderr: '' }, 'the old name chooses nothing, and says nothing');
+  assert.deepEqual(systemOf({}), { brand: null, stderr: '' });
 });
 
-test('AF_BRAND judges a page against the system it names, as STANDARDS_SYSTEM does', { skip }, () => {
+test('STANDARDS_SYSTEM judges a page against the system it names; AF_BRAND is refused, not used', { skip }, () => {
   const house = runWith(STANDARDS, lintArgs, {}, scratch());
   const now = runWith(STANDARDS, lintArgs, { STANDARDS_SYSTEM: ROUNDED });
   const old = runWith(STANDARDS, lintArgs, { AF_BRAND: ROUNDED });
   assert.doesNotThrow(() => JSON.parse(now.stdout), now.stderr);
   assert.notEqual(now.stdout, house.stdout, 'the fixture system changes the verdict, so the variable was read');
-  assert.equal(old.stdout, now.stdout);
-  assert.equal(old.status, now.status);
-  assert.equal(now.stderr, '');
-  assert.equal(old.stderr, `${deprecated('AF_BRAND', 'STANDARDS_SYSTEM')}\n`);
+  assert.equal(now.stderr.includes('deprecated'), false);
+  assert.equal(old.status, 2, 'the old name is not a way to name a system, and is not a quiet pass either');
+  assert.equal(old.stdout, '');
 });
 
-test('both names set to different values exit 2 and name both; the same value in both is not an error', () => {
-  const other = join(FIXTURES, 'instrument.tokens.json');
-  const r = runWith(STANDARDS, ['rules', '--json'], { AF_BRAND: ROUNDED, STANDARDS_SYSTEM: other });
-  assert.equal(r.status, 2, r.stderr);
-  assert.equal(r.stdout, '');
-  assert.match(r.stderr, /AF_BRAND/);
-  assert.match(r.stderr, /STANDARDS_SYSTEM/);
-  const same = runWith(STANDARDS, ['rules', '--json'], { AF_BRAND: ROUNDED, STANDARDS_SYSTEM: ROUNDED });
-  assert.equal(same.status, 0, same.stderr);
-  assert.equal(same.stderr, '', 'the new name supplies the value, so the old one is not used');
+test('both names set to different values: the library uses the new one and does not look at the old; the command refuses the old one', () => {
+  const other = '/no/such/system.tokens.json'; // the old name's value is never opened, so it need not exist
+  assert.deepEqual(systemOf({ AF_BRAND: other, STANDARDS_SYSTEM: ROUNDED }), { brand: ROUNDED, stderr: '' });
+  const r = runWith(STANDARDS, ['rules', '--json'], { AF_BRAND: other, STANDARDS_SYSTEM: ROUNDED });
+  assert.equal(r.status, 2);
+  assert.equal(r.stderr, 'standards: AF_BRAND is no longer read: use STANDARDS_SYSTEM\n');
 });
 
-test("AF_BRAND='' is a value, as STANDARDS_SYSTEM='' is", () => {
-  const now = runWith(STANDARDS, ['rules', '--json'], { STANDARDS_SYSTEM: '' });
-  const old = runWith(STANDARDS, ['rules', '--json'], { AF_BRAND: '' });
-  assert.equal(now.status, 0, now.stderr);
-  assert.equal(old.status, now.status);
-  assert.equal(old.stdout, now.stdout);
-  assert.equal(now.stderr, '');
-  assert.equal(old.stderr, `${deprecated('AF_BRAND', 'STANDARDS_SYSTEM')}\n`);
-});
-
-test("AF_BRAND='' keeps the config out of it, as STANDARDS_SYSTEM='' does", { skip }, () => {
+test("STANDARDS_SYSTEM='' is a value: the house system, with no config read", { skip }, () => {
+  assert.deepEqual(systemOf({ STANDARDS_SYSTEM: '' }), { brand: null, stderr: '' });
   const dir = scratch();
   writeFileSync(join(dir, 'standards.config.json'), JSON.stringify({ system: ROUNDED }));
   const house = runWith(STANDARDS, lintArgs, {}, scratch());
   const configured = runWith(STANDARDS, lintArgs, {}, dir);
-  const now = runWith(STANDARDS, lintArgs, { STANDARDS_SYSTEM: '' }, dir);
-  const old = runWith(STANDARDS, lintArgs, { AF_BRAND: '' }, dir);
+  const empty = runWith(STANDARDS, lintArgs, { STANDARDS_SYSTEM: '' }, dir);
   assert.notDeepEqual(verdict(configured), verdict(house), 'the config alone would have chosen the fixture system');
-  assert.deepEqual(verdict(now), verdict(house), 'an empty value is the house system, so the config is not read');
-  assert.deepEqual(verdict(old), verdict(now));
+  assert.deepEqual(verdict(empty), verdict(house), 'an empty value is the house system, so the config is not read');
 });
 
-test('standards fix, which runs a script of its own, prints one line for AF_BRAND in all', { skip }, () => {
+test('standards fix, which runs a script of its own, takes STANDARDS_SYSTEM through and says nothing about it', { skip }, () => {
   const dir = scratch();
   const page = join(dir, 'page.html');
   copyFileSync(join(FIXTURES, 'violations.html'), page);
-  const r = runWith(STANDARDS, ['fix', page, '--out', join(dir, 'out.html'), '--sample', '0'], { AF_BRAND: ROUNDED }, dir);
-  assert.equal(lines(r.stderr, 'AF_BRAND').length, 1, r.stderr);
-  assert.equal(lines(r.stderr, 'AF_BRAND')[0], deprecated('AF_BRAND', 'STANDARDS_SYSTEM'));
+  const r = runWith(STANDARDS, ['fix', page, '--out', join(dir, 'out.html'), '--sample', '0'], { STANDARDS_SYSTEM: ROUNDED }, dir);
+  assert.doesNotMatch(r.stderr, /deprecated/, r.stderr);
 });
 
-test('AF_CHROMIUM alone is honoured, with one line; both names set apart exit 2', () => {
+test('STANDARDS_CHROMIUM names the browser; AF_CHROMIUM is refused, not used', () => {
   const bad = join(scratch(), 'no-such-chromium');
   const args = ['lint', join(FIXTURES, 'clean.html'), '--sample', '0'];
-  const old = runWith(STANDARDS, args, { AF_CHROMIUM: bad });
   const now = runWith(STANDARDS, args, { STANDARDS_CHROMIUM: bad });
-  for (const r of [old, now]) { assert.notEqual(r.status, 0); assert.ok(r.stderr.includes(bad), `the executable that was asked for is named: ${r.stderr.slice(0, 300)}`); }
-  assert.equal(lines(old.stderr, 'AF_CHROMIUM').length, 1, old.stderr);
-  assert.equal(lines(old.stderr, 'AF_CHROMIUM')[0], deprecated('AF_CHROMIUM', 'STANDARDS_CHROMIUM'));
-  assert.equal(lines(now.stderr, 'AF_CHROMIUM').length, 0);
-  const both = runWith(STANDARDS, args, { AF_CHROMIUM: bad, STANDARDS_CHROMIUM: join(bad, 'x') });
-  assert.equal(both.status, 2, both.stderr);
-  assert.match(both.stderr, /AF_CHROMIUM/);
-  assert.match(both.stderr, /STANDARDS_CHROMIUM/);
+  assert.notEqual(now.status, 0);
+  assert.ok(now.stderr.includes(bad), `the executable that was asked for is named: ${now.stderr.slice(0, 300)}`);
+  const old = runWith(STANDARDS, args, { AF_CHROMIUM: bad });
+  assert.equal(old.status, 2);
+  assert.equal(old.stderr, 'standards: AF_CHROMIUM is no longer read: use STANDARDS_CHROMIUM\n');
 });
 
-test('AF_BRAND beats a config that names another system, under either config name', { skip }, () => {
-  const bare = runWith(STANDARDS, lintArgs, { AF_BRAND: ROUNDED }, scratch());
+test('STANDARDS_SYSTEM beats a config that names another system', { skip }, () => {
+  const bare = runWith(STANDARDS, lintArgs, { STANDARDS_SYSTEM: ROUNDED }, scratch());
   assert.equal(bare.status, 1, 'the fixture page has violations');
-  for (const name of ['standards.config.json', 'af.config.json']) {
-    const dir = scratch();
-    writeFileSync(join(dir, name), JSON.stringify({ system: join(dir, 'a-system-that-is-not-there.json') }));
-    const r = runWith(STANDARDS, lintArgs, { AF_BRAND: ROUNDED }, dir);
-    assert.equal(r.status, bare.status, `${name}: ${r.stderr}`);
-    assert.deepEqual(verdict(r), verdict(bare), `${name}: the variable wins over the config`);
-    assert.equal(lines(r.stderr, 'AF_BRAND').length, 1, `${name}: ${r.stderr}`);
-  }
+  const dir = scratch();
+  writeFileSync(join(dir, 'standards.config.json'), JSON.stringify({ system: join(dir, 'a-system-that-is-not-there.json') }));
+  const r = runWith(STANDARDS, lintArgs, { STANDARDS_SYSTEM: ROUNDED }, dir);
+  assert.equal(r.status, bare.status, r.stderr);
+  assert.deepEqual(verdict(r), verdict(bare), 'the variable wins over the config');
 });
 
-test('a write to AF_BRAND after env.mjs and system-arg.mjs are imported, and before the tokens are, is still read', () => {
-  // eval/builders-report.mjs does exactly this. A shim that copied the variable when it was imported would judge the house system.
+test('a write to STANDARDS_SYSTEM after env.mjs and system-arg.mjs are imported, and before the tokens are, is still read', () => {
+  // eval/builders-report.mjs does exactly this. A copy taken when env.mjs was imported would judge the house system.
   const r = child(`import ${href('src/lib/system-arg.mjs')}; import ${href('src/lib/env.mjs')};
-    process.env.AF_BRAND = ${JSON.stringify(ROUNDED)};
+    process.env.STANDARDS_SYSTEM = ${JSON.stringify(ROUNDED)};
     const { brand } = await import(${href('src/lib/tokens.mjs')}); console.log(brand);`);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), ROUNDED);
-  assert.equal(lines(r.stderr, 'AF_BRAND').length, 1, r.stderr);
+  assert.equal(r.stderr, '');
 });
 
-test('setSystem puts the system under the new name and removes the old one, so an inherited value cannot conflict', () => {
+test('setSystem puts the system under STANDARDS_SYSTEM and leaves an inherited AF_BRAND alone and unread', () => {
   const r = child(`const { setSystem, systemFromEnv } = await import(${href('src/lib/env.mjs')});
     setSystem('x');
     console.log(JSON.stringify({ system: systemFromEnv(), now: process.env.STANDARDS_SYSTEM, old: process.env.AF_BRAND ?? null }));`, { AF_BRAND: 'y' });
   assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(JSON.parse(r.stdout), { system: 'x', now: 'x', old: null });
+  assert.deepEqual(JSON.parse(r.stdout), { system: 'x', now: 'x', old: 'y' });
   assert.equal(r.stderr, '', 'no line and no error');
 });
 
-test('childEnv resolves both pairs to the new names, applies what it is given, and leaves this process alone', () => {
+test('childEnv hands on this process\'s environment, applies what it is given, and leaves this process alone', () => {
   const r = child(`const { childEnv } = await import(${href('src/lib/env.mjs')});
     const e = childEnv({ KEPT: 'k', STANDARDS_SYSTEM: undefined });
-    console.log(JSON.stringify({ e: Object.fromEntries(Object.entries(e).filter(([k]) => /^(AF_BRAND|AF_CHROMIUM|STANDARDS_SYSTEM|STANDARDS_CHROMIUM|KEPT)$/.test(k))), own: process.env.AF_BRAND, ownChromium: process.env.AF_CHROMIUM }));`,
-  { AF_BRAND: ROUNDED, AF_CHROMIUM: '/some/chromium' });
+    console.log(JSON.stringify({ e: Object.fromEntries(Object.entries(e).filter(([k]) => /^(AF_BRAND|AF_CHROMIUM|STANDARDS_SYSTEM|STANDARDS_CHROMIUM|KEPT)$/.test(k))), own: process.env.STANDARDS_SYSTEM }));`,
+  { STANDARDS_SYSTEM: ROUNDED, STANDARDS_CHROMIUM: '/some/chromium' });
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
-  assert.deepEqual(out.e, { STANDARDS_CHROMIUM: '/some/chromium', KEPT: 'k' }, 'old names gone, resolved values under the new ones, undefined removes');
+  assert.deepEqual(out.e, { STANDARDS_CHROMIUM: '/some/chromium', KEPT: 'k' }, 'undefined removes; the rest is passed on');
   assert.equal(out.own, ROUNDED, 'this process keeps what it was given');
-  assert.equal(out.ownChromium, '/some/chromium');
-  const twice = child(`const { childEnv } = await import(${href('src/lib/env.mjs')}); const a = childEnv({}); childEnv({}); console.log(a.STANDARDS_SYSTEM, a.AF_BRAND);`, { AF_BRAND: ROUNDED });
-  assert.equal(twice.stdout.trim(), `${ROUNDED} undefined`);
-  assert.equal(lines(twice.stderr, 'AF_BRAND').length, 1, 'once per process however often it is read');
+  assert.equal(r.stderr, '');
 });
 
-test('systemFromEnv and chromiumFromEnv read the object they are given, and throw when a pair disagrees', async () => {
+test('systemFromEnv and chromiumFromEnv read the object they are given, and read only the STANDARDS_ names', async () => {
   const { systemFromEnv, chromiumFromEnv } = await import('../src/lib/env.mjs');
   const given = Object.freeze({ STANDARDS_SYSTEM: 'a', STANDARDS_CHROMIUM: '/c' });
   assert.equal(systemFromEnv(given), 'a');
@@ -288,40 +244,15 @@ test('systemFromEnv and chromiumFromEnv read the object they are given, and thro
   assert.equal(systemFromEnv({}), undefined);
   assert.equal(chromiumFromEnv({}), undefined);
   assert.equal(systemFromEnv({ STANDARDS_SYSTEM: '' }), '', 'a defined but empty value is a value');
-  assert.equal(systemFromEnv({ STANDARDS_SYSTEM: 'a', AF_BRAND: 'a' }), 'a');
-  assert.equal(systemFromEnv({ STANDARDS_SYSTEM: '', AF_BRAND: '' }), '');
-  assert.throws(() => systemFromEnv({ STANDARDS_SYSTEM: 'a', AF_BRAND: 'b' }), /AF_BRAND.*STANDARDS_SYSTEM|STANDARDS_SYSTEM.*AF_BRAND/);
-  assert.throws(() => systemFromEnv({ STANDARDS_SYSTEM: '', AF_BRAND: 'b' }), /AF_BRAND/, 'empty and set still differ');
-  assert.throws(() => chromiumFromEnv({ STANDARDS_CHROMIUM: '/a', AF_CHROMIUM: '/b' }), /AF_CHROMIUM.*STANDARDS_CHROMIUM|STANDARDS_CHROMIUM.*AF_CHROMIUM/);
+  assert.equal(systemFromEnv({ AF_BRAND: 'b' }), undefined, 'AF_BRAND is not read');
+  assert.equal(chromiumFromEnv({ AF_CHROMIUM: '/b' }), undefined, 'AF_CHROMIUM is not read');
+  assert.equal(systemFromEnv({ STANDARDS_SYSTEM: 'a', AF_BRAND: 'b' }), 'a', 'and it is not a conflict');
 });
 
-// The suite is hermetic about the old name. A shell that still exports AF_BRAND (a person mid-migration, or a
-// CI image) must not change what a test judges: a test that deletes or sets STANDARDS_SYSTEM clears both names.
-test('a test file that sets or deletes STANDARDS_SYSTEM in a child env clears the old name on the same line', () => {
-  const files = readdirSync(join(root, 'test')).filter((f) => f.endsWith('.test.mjs') && !['compat.test.mjs', 'names.test.mjs'].includes(f));
-  const sites = [];
-  for (const f of files) {
-    readFileSync(join(root, 'test', f), 'utf8').split('\n').forEach((line, i) => {
-      if (/process\.env, (\[ENV\.STANDARDS_SYSTEM\]: undefined, )?STANDARDS_SYSTEM:|delete \w+\.STANDARDS_SYSTEM\b/.test(line)) sites.push({ at: `test/${f}:${i + 1}`, line });
-    });
-  }
-  // The private tree has 22 sites and the open export, which ships fewer test files, 13. The floor holds in both:
-  // it is there to notice that the pattern has stopped matching, not to count the tests.
-  assert.ok(sites.length >= 10, `only ${sites.length} sites found: the pattern no longer matches how the tests write the variable`);
-  assert.deepEqual(sites.filter((x) => !x.line.includes('[ENV.STANDARDS_SYSTEM]')).map((x) => x.at), []);
-});
-
-test('the level tests pass in a shell that exports AF_BRAND', () => {
-  const e = { ...env(), AF_BRAND: ROUNDED };
-  delete e.NODE_TEST_CONTEXT; // this file runs under the test runner, which would make the child run its tests unreported
-  const r = spawnSync(process.execPath, ['--test', join(root, 'test/levels.test.mjs')], { encoding: 'utf8', cwd: root, env: e });
-  assert.match(r.stdout, /^# pass [1-9]\d*$/m, 'the level tests ran');
-  assert.equal(r.status, 0, r.stdout.split('\n').filter((l) => /^\s*not ok/.test(l)).join('\n') || r.stderr);
-});
-
-// package.json's brand scripts read the variable in a shell. A person who still exports AF_BRAND (the README
-// said `AF_BRAND=lilac npm run build:brand` until this release) must get what they asked for, not a conflict.
-// `node` is a probe here: it prints the system the script's own environment resolves to, then the arguments.
+// package.json's brand scripts read STANDARDS_SYSTEM in a shell and default to north. A shell that still
+// exports AF_BRAND (the README said `AF_BRAND=lilac npm run build:brand` until 4.0.0) gets north: the old
+// name is not read. `node` is a probe here: it prints the system the script's own environment resolves to,
+// then the arguments.
 const SCRIPTS = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
 const probeNode = () => {
   const dir = scratch();
@@ -337,36 +268,26 @@ const script = (name, set) => {
 };
 const skipScripts = SCRIPTS['build:brand'] ? false : 'the open package has no brand scripts';
 
-test('npm run build:brand, lint:brand and golden:brand take the system from the old name, from the new one, and default to north', { skip: skipScripts }, () => {
+test('npm run build:brand, lint:brand and golden:brand take the system from STANDARDS_SYSTEM and default to north; AF_BRAND is not read', { skip: skipScripts }, () => {
   for (const name of ['build:brand', 'lint:brand', 'golden:brand']) {
-    const fromOld = script(name, { AF_BRAND: 'lilac' });
-    assert.equal(fromOld.status, 0, `${name} under AF_BRAND=lilac: ${fromOld.stderr}`);
-    assert.match(fromOld.out[0], /^system=lilac/, name);
-    assert.equal(fromOld.stderr, '', `${name}: the script hands its child the new name, so no line is printed`);
     const fromNew = script(name, { STANDARDS_SYSTEM: 'lilac' });
     assert.equal(fromNew.status, 0, fromNew.stderr);
     assert.match(fromNew.out[0], /^system=lilac/, name);
+    assert.equal(fromNew.stderr, '', name);
     assert.match(script(name, {}).out[0], /^system=north/, `${name} defaults to north`);
-    const same = script(name, { STANDARDS_SYSTEM: 'lilac', AF_BRAND: 'lilac' });
-    assert.equal(same.status, 0, `${name}: both names agreeing is not a conflict: ${same.stderr}`);
-    // 3.3.0 read the old name with ${AF_BRAND:-north}, so an old name that is set and empty meant nothing, and still does here.
-    const emptyOld = script(name, { AF_BRAND: '' });
-    assert.equal(emptyOld.status, 0, `${name} under AF_BRAND=: ${emptyOld.stderr}`);
-    assert.match(emptyOld.out[0], /^system=north/, `${name} under an empty AF_BRAND defaults to north`);
-    const emptyOldNew = script(name, { AF_BRAND: '', STANDARDS_SYSTEM: 'lilac' });
-    assert.equal(emptyOldNew.status, 0, `${name} under AF_BRAND= and STANDARDS_SYSTEM=lilac: ${emptyOldNew.stderr}`);
-    assert.match(emptyOldNew.out[0], /^system=lilac/, name);
-    // Two different values are the person's own conflict, and the script reports it as the command does.
-    const both = script(name, { STANDARDS_SYSTEM: 'vellum', AF_BRAND: 'lilac' });
-    assert.notEqual(both.status, 0, name);
-    assert.match(both.stderr, /AF_BRAND and STANDARDS_SYSTEM are both set, to different values/, name);
+    const fromOld = script(name, { AF_BRAND: 'lilac' });
+    assert.equal(fromOld.status, 0, `${name} under AF_BRAND=lilac: ${fromOld.stderr}`);
+    assert.match(fromOld.out[0], /^system=north/, `${name} under AF_BRAND=lilac defaults to north: the old name is not read`);
+    assert.equal(fromOld.stderr, '', name);
+    const emptyNew = script(name, { STANDARDS_SYSTEM: '' });
+    assert.match(emptyNew.out[0], /^system=north/, `${name} under an empty STANDARDS_SYSTEM defaults to north`);
   }
-  assert.match(script('lint:brand', { AF_BRAND: 'lilac' }).out[0], /dist\/brands\/lilac\/examples\//, 'the glob follows the system');
+  assert.match(script('lint:brand', { STANDARDS_SYSTEM: 'lilac' }).out[0], /dist\/brands\/lilac\/examples\//, 'the glob follows the system');
 });
 
 test('npm run build:brands and golden:brands render every brand under its own name, whatever the shell exports', { skip: skipScripts }, () => {
   for (const name of ['build:brands', 'golden:brands']) {
-    for (const set of [{}, { AF_BRAND: 'lilac' }, { AF_BRAND: ROUNDED }, { STANDARDS_SYSTEM: 'lilac' }]) {
+    for (const set of [{}, { AF_BRAND: 'lilac' }, { STANDARDS_SYSTEM: ROUNDED }, { STANDARDS_SYSTEM: 'lilac' }]) {
       const r = script(name, set);
       assert.equal(r.status, 0, `${name} under ${JSON.stringify(set)}: ${r.stderr}`);
       assert.deepEqual(r.out.slice(0, 3).map((l) => l.split(' ')[0]), ['system=north', 'system=lilac', 'system=vellum'], `${name} under ${JSON.stringify(set)}`);
@@ -374,104 +295,15 @@ test('npm run build:brands and golden:brands render every brand under its own na
   }
 });
 
-// Both names of a pair set to different values is a usage error wherever it is read, not a stack trace:
-// every entry point that reads the system or the Chromium variable exits 2 with one line, as `standards` does.
-// The system is read when the tokens load. The Chromium is read when a browser starts, so the scripts that
-// start one read it, and so does the MCP server: it starts one on its first lint call, and a conflict found
-// then would end the session after the handshake and drop the requests queued behind it.
-const ENTRY_POINTS = [
-  ['bin/af-mcp.mjs', [], true], ['bin/af.mjs', ['rules'], false], ['scripts/mcp.mjs', ['--selftest'], true],
-  ['scripts/lint-page.mjs', [join(FIXTURES, 'clean.html')], true], ['scripts/audit-pages.mjs', [join(FIXTURES, 'clean.html')], true],
-  ['scripts/fix-page.mjs', [join(FIXTURES, 'clean.html')], true], ['scripts/rules.mjs', [], false], ['scripts/drift.mjs', [], false],
-  ['scripts/golden.mjs', [], false], ['scripts/build-brand.mjs', [], false],
-  // report.mjs loads the tokens by a dynamic import, and only for --tokens. builders-report is private (the export lacks it),
-  // and with no brief on every side it lints nothing, so only the Chromium pair is read: the fourth value says so.
-  ['scripts/report.mjs', ['--tokens', join(FIXTURES, 'clean.html')], false],
-  ['eval/builders-report.mjs', [join(FIXTURES, 'builders'), '--ours', join(FIXTURES, 'builders/pipeline'), '--out', join(tmpdir(), 'standards-compat-builders.html')], true, 'chromium only'],
-].filter(([file]) => existsSync(join(root, file)));
-
-test('a conflict between the old and the new name exits 2 with one line from every entry point, and no stack', () => {
-  assert.ok(ENTRY_POINTS.length >= 8, `only ${ENTRY_POINTS.length} entry points exist`);
-  for (const [file, args, startsBrowser, only] of ENTRY_POINTS) {
-    const pairs = [...(only ? [] : [['STANDARDS_SYSTEM', 'AF_BRAND']]), ...(startsBrowser ? [['STANDARDS_CHROMIUM', 'AF_CHROMIUM']] : [])];
-    for (const [now, old] of pairs) {
-      const r = runWith(join(root, file), args, { [now]: 'a', [old]: 'b' });
-      const where = `${file} under ${now} and ${old}`;
-      assert.equal(r.status, 2, `${where}: ${r.stderr}`);
-      assert.match(r.stderr, new RegExp(`^standards: ${old} and ${now} are both set, to different values`, 'm'), where);
-      assert.doesNotMatch(r.stderr, /\n\s+at |Error:/, `${where}: no stack trace`);
-      assert.equal(r.stdout, '', `${where}: nothing is written to stdout before the conflict is reported`);
-    }
-  }
-});
-
-// The library throws; only a process that is the entry point exits. A program that imports the package
-// (src/index.mjs, or the ./mcp export that agent hosts embed) gets an error it can catch and carries on.
-test('a host that imports the library under a conflict gets a catchable error, and its process survives', () => {
-  // The open export has no src/index.mjs; tokens.mjs is where the package's own entry reads the variable as it loads.
-  const index = href(existsSync(join(root, 'src/index.mjs')) ? 'src/index.mjs' : 'src/lib/tokens.mjs');
-  const importing = child(`let message = null;
-    try { await import(${index}); } catch (e) { message = e.message; }
-    console.log(JSON.stringify({ message, alive: true }));`, { STANDARDS_SYSTEM: 'a', AF_BRAND: 'b' });
-  assert.equal(importing.status, 0, `the host was ended by the library: ${importing.stderr}`);
-  const seen = JSON.parse(importing.stdout);
-  assert.match(seen.message, /AF_BRAND and STANDARDS_SYSTEM are both set, to different values/, 'the import rejects, and says why');
-  assert.equal(seen.alive, true);
-
-  // The pair can also change while a host runs. The MCP handler turns a failed measurement into a result the model can act on.
-  const calling = child(`const index = await import(${index});
-    const { handle } = await import(${href('src/lib/mcp.mjs')});
-    const { chromiumFromEnv } = await import(${href('src/lib/env.mjs')});
-    process.env.STANDARDS_CHROMIUM = '/a'; process.env.AF_CHROMIUM = '/b';
-    let direct = null;
-    try { chromiumFromEnv(); } catch (e) { direct = e.message; }
-    const lint = await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'standards_lint', arguments: { html: '<!doctype html><title>t</title>' } } });
-    const after = await handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-    console.log(JSON.stringify({ loaded: typeof index.brand, direct, isError: lint.result?.isError, text: lint.result?.content?.[0]?.text, tools: after.result?.tools?.length }));`);
-  assert.equal(calling.status, 0, `the host was ended by the library: ${calling.stderr}`);
-  const got = JSON.parse(calling.stdout);
-  assert.match(got.direct, /AF_CHROMIUM and STANDARDS_CHROMIUM are both set, to different values/);
-  assert.equal(got.isError, true, 'standards_lint reports the conflict as a failed measurement');
-  assert.match(got.text, /AF_CHROMIUM and STANDARDS_CHROMIUM are both set/);
-  assert.ok(got.tools > 0, 'the handler still answers after it');
-});
-
-// Every script that is run directly and reads either variable, whether in a call or where the tokens load,
-// imports src/lib/env-guard.mjs before anything else, which is what turns the library's error into
-// `standards: <message>` and exit 2. A file that does not would give a stack trace and exit 1.
-test('every entry point that reads the system or the Chromium variable imports the guard first', () => {
-  const packageScripts = JSON.stringify(SCRIPTS);
-  const LOAD_READERS = new Set(['src/lib/tokens.mjs', 'src/lib/build-utils.mjs', 'scripts/golden.mjs']);
-  const deps = (rel) => {
-    const out = [];
-    for (const m of readFileSync(join(root, rel), 'utf8').matchAll(/(?:from\s+|import\s*\(\s*|import\s+)['"](\.[^'"]+)['"]/g)) {
-      out.push({ path: normalize(join(dirname(rel), m[1])), dynamic: /import\s*\(/.test(m[0]) });
-    }
-    return out;
-  };
-  const readsAtLoad = (rel, seen = new Set()) => {
-    if (LOAD_READERS.has(rel)) return true;
-    if (seen.has(rel) || !existsSync(join(root, rel))) return false;
-    seen.add(rel);
-    return deps(rel).some((d) => readsAtLoad(d.path, seen));
-  };
-  const entries = [];
-  for (const dir of ['bin', 'scripts', 'eval']) {
+// A script that is run directly and reads the system or the Chromium variable does so through src/lib/env.mjs, which
+// has no old-name fallback. Nothing in the tree that is run reads AF_BRAND or AF_CHROMIUM any more.
+test('no entry point reads AF_BRAND or AF_CHROMIUM', () => {
+  const offenders = [];
+  for (const dir of ['bin', 'scripts', 'src/lib', 'eval']) {
     if (!existsSync(join(root, dir))) continue;
     for (const name of readdirSync(join(root, dir)).filter((f) => f.endsWith('.mjs'))) {
-      const rel = `${dir}/${name}`;
-      const text = readFileSync(join(root, rel), 'utf8');
-      const run = dir !== 'eval' || text.startsWith('#!') || packageScripts.includes(rel);
-      if (run && (readsAtLoad(rel) || /systemFromEnv|chromiumFromEnv|childEnv|setSystem/.test(text))) entries.push({ rel, text });
+      if (/AF_BRAND\b|AF_CHROMIUM\b/.test(readFileSync(join(root, dir, name), 'utf8')) && !(dir === 'src/lib' && ['env.mjs', 'names.mjs', 'removed-names.mjs'].includes(name))) offenders.push(`${dir}/${name}`);
     }
   }
-  assert.ok(entries.length >= 8, `only ${entries.length} entry points found: the search no longer matches how they are written`);
-  const guard = /^import\s+(?:[^'"]*\sfrom\s+)?['"][^'"]*\/src\/lib\/env-guard\.mjs['"];/m;
-  const bad = entries.filter(({ text }) => {
-    const first = text.search(/^import\s+(?:[^'"]*\sfrom\s+)?['"]/m);
-    const at = text.search(guard);
-    const dynamic = text.search(/\bimport\(/);
-    return at === -1 || at !== first || (dynamic !== -1 && dynamic < at);
-  });
-  assert.deepEqual(bad.map((x) => x.rel), []);
+  assert.deepEqual(offenders, []);
 });

@@ -16,7 +16,6 @@
  * A consumer installs `stylelint` and `stylelint-declaration-strict-value` themselves; neither is
  * a dependency of this package, which has one.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { fileURLToPath } from 'node:url';
 import { writeAtomic } from '../src/lib/build-utils.mjs';
 import { colors, spacingScale, fonts, radiusScale, absent } from '../src/lib/tokens.mjs';

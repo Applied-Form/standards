@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { realpathSync } from 'node:fs';
 import { dirname, resolve, sep } from 'node:path';
 import { specFromPage } from './page-spec.mjs';
+import { measurePacing } from './pacing.mjs';
 import { chromiumFromEnv } from './env.mjs';
 import { lint, advise } from './rules.mjs';
 import { appliesToPack } from './rules/registry.mjs';
@@ -288,8 +289,25 @@ export async function lintPages(urls, { viewports = VIEWPORTS, browser, register
               const nr = next.getBoundingClientRect(); const nextTop = nr.top + window.scrollY;
               return Math.floor(top / pageH) !== Math.floor((nextTop + Math.min(nr.height, 40)) / pageH) && getComputedStyle(h).breakAfter !== 'avoid';
             }).map((h) => h.textContent.trim().slice(0, 40));
-            return { overflowX: Math.max(0, de.scrollWidth - de.clientWidth), linksWithoutHref: withoutHref, orphanHeadings: orphans, pages: Math.ceil(de.scrollHeight / pageH) };
+            const top = (el) => el.getBoundingClientRect().top + window.scrollY;
+            // Printed body size: the computed size that carries the most characters of running text.
+            const weight = new Map();
+            for (const el of document.querySelectorAll('p, li')) {
+              if (el.closest('nav, figure, table, .af-provenance, .af-callout, .af-code')) continue;
+              const chars = [...el.childNodes].reduce((n, c) => n + (c.nodeType === 3 ? c.textContent.trim().length : 0), 0);
+              if (!chars) continue;
+              const pt = Math.round(parseFloat(getComputedStyle(el).fontSize) * 0.75 * 10) / 10;
+              weight.set(pt, (weight.get(pt) ?? 0) + chars);
+            }
+            const bodyPt = weight.size ? [...weight].sort((a, b) => b[1] - a[1])[0][0] : null;
+            const back = document.querySelector('[data-part="back-matter"]');
+            return {
+              overflowX: Math.max(0, de.scrollWidth - de.clientWidth), linksWithoutHref: withoutHref, orphanHeadings: orphans, pages: Math.ceil(de.scrollHeight / pageH),
+              bodyPt, scrollHeight: de.scrollHeight, openerTops: [...document.querySelectorAll('[data-part="opener"]')].map(top), backMatterTop: back ? top(back) : null,
+            };
           }, pageH);
+          const { scrollHeight, openerTops, backMatterTop, ...measured } = printSpec;
+          printSpec = { ...measured, pacing: measurePacing({ pageH, scrollHeight, openerTops, backMatterTop }) };
           await printPage.close();
           loaded();
         }

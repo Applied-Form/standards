@@ -17,7 +17,6 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fromPack } from '../src/lib/pack.mjs';
 import { launchBrowser } from '../src/lib/page-lint.mjs';
-import { ENV } from '../src/lib/names.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const pages = join(root, 'test/fixtures/packs/instrument');
@@ -48,7 +47,7 @@ test("Instrument's reference pages show exactly Instrument's own breaches under 
     }
     await browser.close();
     console.log(JSON.stringify(out));`);
-  const run = spawnSync(process.execPath, [join(dir, 'child.mjs')], { env: { ...process.env, [ENV.STANDARDS_SYSTEM]: undefined, STANDARDS_SYSTEM: join(dir, 'system.json') }, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, [join(dir, 'child.mjs')], { env: { ...process.env, STANDARDS_SYSTEM: join(dir, 'system.json') }, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   assert.deepEqual(JSON.parse(run.stdout.trim().split('\n').pop()), GENUINE);
 });

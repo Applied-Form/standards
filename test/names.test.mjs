@@ -1,65 +1,62 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as names from '../src/lib/names.mjs';
-import { TOOLS } from '../src/lib/mcp.mjs';
+import { TOOLS, HANDLERS } from '../src/lib/mcp.mjs';
 
-// This file spells the old names on purpose. It is the one place that checks the names module against an
-// independent copy of what it replaces, so deriving them from the module would make each assertion
-// compare the module with itself. A search for the old names that includes test/ lists this file (and
-// test/compat.test.mjs) as exempt: the stage 6 and stage 9 greps say so.
+// The old names were removed in 5.0.0 (decision 0029, "What 5.0.0 removes"). This file spells them on
+// purpose: it checks the names module and the tree against an independent copy of what was removed,
+// so deriving them from the module would make each assertion compare the module with itself. A search
+// for the old names that includes test/ lists this file (and test/compat.test.mjs, test/config-files.test.mjs
+// and test/mcp.test.mjs) as exempt.
 
-const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'));
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+const OLD_TOOLS = ['af_lint', 'af_fix', 'af_rules', 'af_tokens', 'af_contrast', 'af_brand', 'af_move', 'af_system', 'af_drift'];
 
-test('deprecated() is one line that names the old name, the new name and the removal release', () => {
-  const line = names.deprecated('af', 'standards');
-  assert.equal(line, 'af is deprecated: use standards. af will be removed in Standards 5.0.0.');
-  assert.ok(!/[\r\n]/.test(line), 'one line: the caller writes the newline');
-  assert.ok(line.includes('af') && line.includes('standards') && line.includes(names.REMOVE_IN));
-  // test/af-audit.test.mjs counts lines that say "warning" on stderr, and stdout carries JSON and the
-  // MCP protocol, so the text has to stay clear of that word.
-  assert.doesNotMatch(line, /warning/i);
-  assert.doesNotMatch(names.deprecated('AF_BRAND', 'STANDARDS_SYSTEM'), /warning/i);
+test('the names module holds the names the product has, and nothing that was removed', () => {
+  assert.equal(names.COMMAND, 'standards');
+  assert.equal(names.PACKAGE, '@appliedform/standards');
+  assert.equal(names.CLIENT_KEY, 'standards');
+  assert.deepEqual(names.CONFIG, { name: 'standards.config.json' });
+  assert.deepEqual(names.BASELINE, { name: 'standards-baseline.json' });
+  assert.deepEqual(names.DIR, { name: '.standards' });
+  // The removal date, the deprecation line and the maps from an old name to a new one are gone with the names.
+  for (const gone of ['REMOVE_IN', 'deprecated', 'TOOL_MAP', 'ENV', 'NOTED']) assert.equal(gone in names, false, `${gone} is not exported`);
 });
 
-test('the tool map covers exactly the tool names the MCP server lists', () => {
-  // The server lists the map's values; the legacy profile lists its keys (test/mcp.test.mjs).
-  const listed = TOOLS.map((t) => t.name).sort();
-  const old = Object.keys(names.TOOL_MAP).sort();
-  const current = Object.values(names.TOOL_MAP).sort();
-  assert.equal(old.length, 9);
-  assert.deepEqual(listed, current);
-  for (const [from, to] of Object.entries(names.TOOL_MAP)) {
-    assert.equal(to, from.replace(/^af_/, 'standards_'), `${from} maps to the same verb under the new prefix`);
-  }
-});
-
-test('the env map names the two variables a user can set, new name to old', () => {
-  assert.deepEqual(names.ENV, { STANDARDS_SYSTEM: 'AF_BRAND', STANDARDS_CHROMIUM: 'AF_CHROMIUM' });
-});
-
-test('the one internal variable the product sets for its own children is held here, and is not one a user can set', () => {
-  assert.equal(names.NOTED, 'STANDARDS_NOTED');
-  assert.ok(!Object.keys(names.ENV).includes(names.NOTED));
-});
-
-test('the report generator and its legacy values are distinct', () => {
+test('the report generator and its two older values are the one old name that stays, and are distinct', () => {
   assert.equal(names.GENERATOR, 'standards audit');
   assert.deepEqual([...names.LEGACY_GENERATORS].sort(), ['af audit', 'af report']);
   assert.ok(!names.LEGACY_GENERATORS.includes(names.GENERATOR));
 });
 
-test('every renamed file and directory carries the legacy name it replaces', () => {
-  assert.deepEqual(names.CONFIG, { name: 'standards.config.json', legacy: 'af.config.json' });
-  assert.deepEqual(names.BASELINE, { name: 'standards-baseline.json', legacy: 'af-baseline.json' });
-  assert.deepEqual(names.DIR, { name: '.standards', legacy: '.af' });
+test('the package installs one bin, standards, and the old bins and their files are gone', () => {
+  assert.deepEqual(pkg.bin, { standards: 'bin/standards.mjs' });
+  for (const file of ['bin/af.mjs', 'bin/af-mcp.mjs', 'src/lib/env-guard.mjs', 'src/lib/resolve-file.mjs']) assert.equal(existsSync(join(ROOT, file)), false, `${file} is gone`);
+  assert.deepEqual(readdirSync(join(ROOT, 'bin')), ['standards.mjs']);
+  if (!existsSync(join(ROOT, 'package-lock.json'))) return; // the open export carries no lock file
+  const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'));
+  assert.deepEqual(lock.packages[''].bin, { standards: 'bin/standards.mjs' }, 'the lock file agrees');
 });
 
-test('the package major is below the major the old names are removed in', () => {
-  // The mechanism that makes the promise real, as for tokens (test/tooling.test.mjs): this fails at
-  // 5.0.0, so the shims cannot outlive the release that said they would go.
-  const major = Number(pkg.version.split('.')[0]);
-  const removeMajor = Number(names.REMOVE_IN.split('.')[0]);
-  assert.ok(major < removeMajor, `the old names were to be removed in ${names.REMOVE_IN} and this is ${pkg.version}`);
+test('the MCP server lists the standards_* tools and has no handler under an af_* name', () => {
+  const listed = TOOLS.map((t) => t.name);
+  assert.equal(listed.length, 9);
+  for (const name of listed) assert.match(name, /^standards_[a-z]+$/);
+  for (const old of OLD_TOOLS) {
+    assert.ok(!listed.includes(old), `${old} is not listed`);
+    assert.equal(Object.hasOwn(HANDLERS, old), false, `${old} has no handler`);
+  }
+  assert.deepEqual([...listed].sort(), Object.keys(HANDLERS).sort(), 'every listed tool has a handler and every handler is listed');
+});
+
+test('no script reads the old variables or the legacy tool profile, and none writes a deprecation line', () => {
+  const old = /AF_BRAND\b|AF_CHROMIUM\b|--legacy-tool-names|is deprecated: use|will be removed in Standards/;
+  const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+  const files = ['package.json', ...['bin', 'src', 'scripts'].flatMap((dir) => readdirSync(join(ROOT, dir), { recursive: true }).filter((f) => /\.(mjs|js|json)$/.test(f)).map((f) => `${dir}/${f}`))];
+  assert.ok(files.length > 40, `only ${files.length} files searched`);
+  assert.deepEqual(files.filter((f) => old.test(read(f)) && !['src/lib/env.mjs', 'src/lib/names.mjs', 'src/lib/removed-names.mjs'].includes(f)), []);
 });

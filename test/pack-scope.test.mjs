@@ -18,7 +18,6 @@ import { fileURLToPath } from 'node:url';
 import { fromPack } from '../src/lib/pack.mjs';
 import { RULES } from '../src/lib/rules/registry.mjs';
 import { launchBrowser } from '../src/lib/page-lint.mjs';
-import { ENV } from '../src/lib/names.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const instrument = JSON.parse(readFileSync(new URL('./fixtures/instrument.tokens.json', import.meta.url), 'utf8'));
@@ -47,7 +46,7 @@ function lintUnder(pack, pages) {
     }
     await browser.close();
     console.log(JSON.stringify(out));`);
-  const run = spawnSync(process.execPath, [join(dir, 'child.mjs')], { env: { ...process.env, [ENV.STANDARDS_SYSTEM]: undefined, STANDARDS_SYSTEM: join(dir, 'system.json') }, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, [join(dir, 'child.mjs')], { env: { ...process.env, STANDARDS_SYSTEM: join(dir, 'system.json') }, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   return { fired: JSON.parse(run.stdout.trim().split('\n').pop()), report };
 }

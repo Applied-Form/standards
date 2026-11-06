@@ -13,7 +13,6 @@
  * report and the reader has to be able to tell. Needs network; it is what `.github/workflows/drift.yml`
  * runs, and it runs the same way on any machine that can reach the sites.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';

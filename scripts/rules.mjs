@@ -6,7 +6,6 @@
  *   node scripts/rules.mjs --json       the registry as JSON
  *   node scripts/rules.mjs --wcag       only rules with a WCAG 2.2 mapping, grouped by SC
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { pathToFileURL } from 'node:url';
 import { RULES, GROUPS } from '../src/lib/rules/registry.mjs';
 

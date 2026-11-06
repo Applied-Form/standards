@@ -8,13 +8,13 @@
     "url": "https://github.com/Applied-Form/standards",
     "source": "github"
   },
-  "version": "4.0.1",
+  "version": "5.0.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@appliedform/standards",
-      "version": "4.0.1",
+      "version": "5.0.0",
       "transport": {
         "type": "stdio"
       },

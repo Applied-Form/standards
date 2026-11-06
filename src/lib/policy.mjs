@@ -17,10 +17,9 @@
  * lint-page and lint-site apply exactly the same policy.
  */
 import { readFileSync, existsSync } from 'node:fs';
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { RULES } from './rules/registry.mjs';
 import { CONFIG } from './names.mjs';
-import { resolveFile } from './resolve-file.mjs';
 
 /**
  * A mandatory rule cannot be lowered (decision 0027). A policy that runs one as `warn` or `off` is
@@ -73,17 +72,15 @@ export function pageKey(url, viewport, cwd = process.cwd()) {
 }
 
 /**
- * Read standards.config.json in a directory (the old name is read too, with one line: see
- * resolveFile), or an explicit path.
+ * Read standards.config.json in a directory, or an explicit path.
  *
  * A missing *implicit* file is not an error: the defaults are the system's. A missing *explicit*
  * path is, because a typo in `--config standards.confg.json` would otherwise silently run every rule at
  * `error` with no baseline, and the run would pass or fail for the wrong reason without a word.
- * An explicit path gets no fallback to the other name.
  */
 export function loadConfig(pathOrCwd = process.cwd()) {
   const explicit = pathOrCwd.endsWith('.json');
-  const file = explicit ? pathOrCwd : resolveFile(pathOrCwd, CONFIG.name, CONFIG.legacy).path;
+  const file = explicit ? pathOrCwd : join(pathOrCwd, CONFIG.name);
   if (!existsSync(file)) {
     if (explicit) throw new Error(`config file not found: ${file}`);
     return { rules: {}, baseline: null, source: null };

@@ -5,7 +5,6 @@
  * bar labels, figure). Everything references the custom properties in
  * dist/tokens.css; load that first.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { systemName, systemVersion, grid, floors, layers, bleeds, composition, aspectRatios, print, registers, spacingScale, radiusTokens, elevationTokens } from '../src/lib/tokens.mjs';
 import { outDir, typeShorthand as type , DIST, writeAtomic } from '../src/lib/build-utils.mjs';
 
@@ -151,6 +150,7 @@ L.push('  [data-register] { background: var(--af-color-white); color: var(--af-c
 L.push('  .af-skip, .af-actions, .af-button, nav, .af-nav, .af-pagination { display: none !important; }');
 L.push('  .af-masthead { background: var(--af-color-white); color: var(--af-color-text-ii); border-bottom: var(--af-rule-hairline) solid var(--af-color-ink); } .af-masthead .af-wordmark { color: var(--af-color-ink); } .af-masthead .af-label { color: var(--af-muted); }');
 L.push('  .af-page { max-width: none; padding-inline: 0; }');
+L.push(`  [data-register^="ii"] .af-page :is(p, li):not(.af-footnotes li, .af-callout *, .af-provenance *, .af-code *, figure *, table *, nav *) { font-size: ${print.body}; }`);
 L.push('  h1, h2, h3 { break-after: avoid; } figure, table, .af-provenance, .af-callout, .af-code { break-inside: avoid; }');
 L.push('  a[href^="http"]::after { content: " (" attr(href) ")"; font-family: var(--af-font-data); font-size: 0.8em; color: var(--af-muted); }');
 L.push('  .af-table-scroll { overflow: visible; }');

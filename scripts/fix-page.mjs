@@ -20,13 +20,12 @@
  * Exit 0 when the fixed page passes every checked rule at every width measured, 1 when violations
  * remain, 2 on a usage or load error.
  */
-import { exitOnConflict } from '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve, dirname, basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
-import { systemFromEnv, setSystem, childEnv, CONFLICT } from '../src/lib/env.mjs';
+import { systemFromEnv, setSystem, childEnv } from '../src/lib/env.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const USAGE = 'usage: standards fix <page.html | url> [--out fixed.html] [--json] [--system <tokens.json | pack | name>] [--register i|ii] [--widths 320,1280] [--sample n] [--seed n]';
@@ -139,7 +138,7 @@ if (/^https?:\/\//i.test(target)) {
 const output = opts.out ? resolve(opts.out) : defaultOut;
 
 let browser;
-try { browser = await launchBrowser(); } catch (e) { if (e?.code === CONFLICT) exitOnConflict(e); fail(`could not start Chromium (${e.message.split('\n')[0]}). Run npx playwright install chromium, or set STANDARDS_CHROMIUM to a Chromium executable.`); }
+try { browser = await launchBrowser(); } catch (e) { fail(`could not start Chromium (${e.message.split('\n')[0]}). Run npx playwright install chromium, or set STANDARDS_CHROMIUM to a Chromium executable.`); }
 let fixed;
 try {
   fixed = await fixPage(html, { browser, register, viewports, fileRoots, baseHref, unregistered: !systemFromEnv() && register == null ? 'universal' : 'house' });

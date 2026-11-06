@@ -60,23 +60,14 @@ call without 320 never measures `horizontal-overflow` at 320px.
 
 ## Names that changed
 
-The product was called the engine, and its command `af`, in 3.x. The old names still run in 4.x, each
-says once on stderr that it is deprecated, and they are removed in Standards 5.0.0. Uninstall
-`@appliedform/engine` before installing `@appliedform/standards`: both ship the `af` and `af-mcp`
-bins, so a global install of one over the other fails with EEXIST.
-
-| 3.x | Now | The old name |
-|---|---|---|
-| package `@appliedform/engine` | `@appliedform/standards` | Uninstall `@appliedform/engine` first |
-| command `af` | `standards` | Runs the same command after one line on stderr |
-| `af-mcp`, `af mcp` | `standards mcp` | Serve as before, listing the `af_*` tools |
-| tools `af_lint` and the eight others | `standards_lint` and the eight others | Both names are accepted by every route |
-| `af.config.json` | `standards.config.json` | Read, with one line; the new file wins if both exist |
-| `af-baseline.json` | `standards-baseline.json` | Read and written at its own path, with one line |
-| `.af/` | `.standards/` | A path to it in a config is a plain path and keeps working |
-| `AF_BRAND`, `AF_CHROMIUM` | `STANDARDS_SYSTEM`, `STANDARDS_CHROMIUM` | Read on every use, with one line; both names of a pair set to different values exits 2 |
-| `af-audit.html`, the default report file | `standards-audit.html` | None |
-| the `engine` bin | none | None |
+Standards 5.0.0 removed the names the product had before it was called Standards: the `af` and `af-mcp`
+commands, the `af_*` MCP tools, `AF_BRAND` and `AF_CHROMIUM`, `af.config.json`, `af-baseline.json` and
+`.af/`. They are not read: `standards` stops with exit status 2 and one line naming the replacement when a variable or file under an old name is in use. `standards`, the `standards_*` tools,
+`STANDARDS_SYSTEM`, `STANDARDS_CHROMIUM`, `standards.config.json`, `standards-baseline.json` and
+`.standards/` replace them, and the default report file is `standards-audit.html`. Uninstall
+`@appliedform/engine` before installing `@appliedform/standards`: both ship the `af` and `af-mcp` bins,
+so a global install of one over the other fails with EEXIST. The full list, with what to change, is in
+`docs/migrating-to-5.md`.
 
 Documents recorded before the rename, such as the decision records and the evaluation protocol and
 its results, use the old names, and are not rewritten.

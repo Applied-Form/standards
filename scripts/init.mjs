@@ -6,12 +6,10 @@
  * judges pages against the pack's own rules. `instrument` is the free pack, bundled (CC BY 4.0).
  * A pack that cannot meet the floors is refused with the measurement, as `standards system import` refuses it.
  */
-import '../src/lib/env-guard.mjs'; // first: a name conflict exits 2 (src/lib/env-guard.mjs)
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fromPack } from '../src/lib/pack.mjs';
 import { CONFIG, DIR } from '../src/lib/names.mjs';
-import { resolveFile } from '../src/lib/resolve-file.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const args = process.argv.slice(2);
@@ -27,10 +25,7 @@ if (!overlay) {
   console.error(`${pack.system ?? 'The pack'} was refused:\n  ${report.refused.join('\n  ')}\nA system that cannot meet the floors is a finding for its author.`);
   process.exit(1);
 }
-// A config under the old name is read, with one line, and is never deleted or rewritten: what it
-// holds is carried into the new file, which is the one every command reads from here on.
-const found = resolveFile('.', CONFIG.name, CONFIG.legacy);
-const config = found.exists ? JSON.parse(readFileSync(found.path, 'utf8')) : {};
+const config = existsSync(CONFIG.name) ? JSON.parse(readFileSync(CONFIG.name, 'utf8')) : {};
 const system = `${DIR.name}/system.json`;
 mkdirSync(DIR.name, { recursive: true });
 writeFileSync(system, `${JSON.stringify(overlay, null, 2)}\n`);
